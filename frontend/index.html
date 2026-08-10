@@ -1,0 +1,695 @@
+<!DOCTYPE html>
+<html lang="es" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>GeoRiesgo Chile</title>
+
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Serif:ital,wght@0,400;0,500;0,600;1,400&display=swap" rel="stylesheet">
+
+<style>
+  :root,
+  html[data-theme="dark"] {
+    --bg: #292824;
+    --panel: #322f29;
+    --panel-raised: #3c3830;
+    --line: #4c473c;
+    --text: #efe9dc;
+    --text-dim: #a89f8e;
+    --text-faint: #7d7566;
+
+    --risk-alto: #cd6440;
+    --risk-alto-bg: rgba(205, 100, 64, 0.16);
+    --risk-moderado: #d8ab5c;
+    --risk-moderado-bg: rgba(216, 171, 92, 0.16);
+    --risk-bajo: #6ba290;
+    --risk-bajo-bg: rgba(107, 162, 144, 0.16);
+
+    --contour-tint: rgba(239, 233, 220, 0.05);
+    --map-tiles: dark_all;
+
+    --serif: 'IBM Plex Serif', Georgia, serif;
+    --mono: 'IBM Plex Mono', 'SF Mono', Menlo, monospace;
+  }
+
+  html[data-theme="light"] {
+    --bg: #f2ede1;
+    --panel: #faf7ef;
+    --panel-raised: #efe8d7;
+    --line: #ddd3bc;
+    --text: #2b2621;
+    --text-dim: #6b6252;
+    --text-faint: #928975;
+
+    --risk-alto: #b3502c;
+    --risk-alto-bg: rgba(179, 80, 44, 0.13);
+    --risk-moderado: #a2792a;
+    --risk-moderado-bg: rgba(162, 121, 42, 0.14);
+    --risk-bajo: #3f7c69;
+    --risk-bajo-bg: rgba(63, 124, 105, 0.13);
+
+    --contour-tint: rgba(43, 38, 33, 0.045);
+    --map-tiles: voyager;
+  }
+
+  * { box-sizing: border-box; }
+
+  html, body {
+    margin: 0;
+    height: 100%;
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--mono);
+    overflow: hidden;
+    transition: background 0.25s ease, color 0.25s ease;
+  }
+
+  #app {
+    display: grid;
+    grid-template-columns: 1fr 400px;
+    height: 100vh;
+    width: 100vw;
+  }
+
+  /* ---------- Map ---------- */
+  #map {
+    height: 100%;
+    width: 100%;
+    background: var(--bg);
+  }
+
+  .leaflet-container {
+    background: var(--bg) !important;
+    font-family: var(--mono) !important;
+  }
+
+  /* Tiles topográficos reales (relieve, curvas de nivel) recoloreados por tema.
+     En claro se ven en sus tonos naturales; en oscuro se invierten con un
+     filtro para mantener el relieve visible sin quedar negro plano. */
+  html[data-theme="dark"] .leaflet-tile-pane {
+    filter: invert(94%) hue-rotate(180deg) brightness(0.92) contrast(0.95) saturate(0.65);
+  }
+
+  .leaflet-control-attribution {
+    background: rgba(0, 0, 0, 0.35) !important;
+    color: var(--text-dim) !important;
+  }
+  .leaflet-control-attribution a { color: var(--text) !important; }
+
+  .leaflet-control-zoom a {
+    background: var(--panel) !important;
+    color: var(--text) !important;
+    border-color: var(--line) !important;
+  }
+  .leaflet-control-zoom a:hover { background: var(--panel-raised) !important; }
+
+  .risk-marker {
+    border-radius: 50%;
+    border: 2px solid var(--bg);
+    box-shadow: 0 0 0 2px currentColor;
+  }
+
+  /* ---------- Sidebar ---------- */
+  #sidebar {
+    background: var(--panel);
+    border-left: 1px solid var(--line);
+    display: flex;
+    flex-direction: column;
+    overflow-y: auto;
+    position: relative;
+  }
+
+  /* Subtle topographic contour texture, geology-adjacent signature detail */
+  #sidebar::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    background-color: var(--contour-tint);
+    -webkit-mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='260' height='260' viewBox='0 0 260 260'%3E%3Cg fill='none' stroke='%23000' stroke-width='1.1'%3E%3Cpath d='M-10 40 Q 60 10, 130 40 T 270 40'/%3E%3Cpath d='M-10 75 Q 60 45, 130 75 T 270 75'/%3E%3Cpath d='M-10 110 Q 60 80, 130 110 T 270 110'/%3E%3Cpath d='M-10 145 Q 60 115, 130 145 T 270 145'/%3E%3Cpath d='M-10 180 Q 60 150, 130 180 T 270 180'/%3E%3Cpath d='M-10 215 Q 60 185, 130 215 T 270 215'/%3E%3Cpath d='M-10 250 Q 60 220, 130 250 T 270 250'/%3E%3C/g%3E%3C/svg%3E");
+    mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='260' height='260' viewBox='0 0 260 260'%3E%3Cg fill='none' stroke='%23000' stroke-width='1.1'%3E%3Cpath d='M-10 40 Q 60 10, 130 40 T 270 40'/%3E%3Cpath d='M-10 75 Q 60 45, 130 75 T 270 75'/%3E%3Cpath d='M-10 110 Q 60 80, 130 110 T 270 110'/%3E%3Cpath d='M-10 145 Q 60 115, 130 145 T 270 145'/%3E%3Cpath d='M-10 180 Q 60 150, 130 180 T 270 180'/%3E%3Cpath d='M-10 215 Q 60 185, 130 215 T 270 215'/%3E%3Cpath d='M-10 250 Q 60 220, 130 250 T 270 250'/%3E%3C/g%3E%3C/svg%3E");
+    -webkit-mask-repeat: repeat;
+    mask-repeat: repeat;
+    -webkit-mask-size: 260px 260px;
+    mask-size: 260px 260px;
+    z-index: 0;
+  }
+
+  .brand, .panel-body, .disclaimer { position: relative; z-index: 1; }
+
+  .brand {
+    padding: 20px 22px 16px;
+    border-bottom: 1px solid var(--line);
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 12px;
+  }
+
+  .brand-text h1 {
+    font-family: var(--serif);
+    font-weight: 600;
+    font-size: 21px;
+    letter-spacing: 0.01em;
+    margin: 0 0 4px;
+    color: var(--text);
+  }
+
+  .brand-text p {
+    margin: 0;
+    font-size: 12px;
+    color: var(--text-dim);
+    line-height: 1.5;
+  }
+
+  /* ---------- Theme toggle ---------- */
+  .theme-toggle {
+    display: flex;
+    border: 1px solid var(--line);
+    border-radius: 20px;
+    overflow: hidden;
+    flex-shrink: 0;
+    background: var(--panel-raised);
+  }
+
+  .theme-toggle button {
+    background: transparent;
+    border: none;
+    padding: 6px 9px;
+    cursor: pointer;
+    color: var(--text-faint);
+    display: flex;
+    align-items: center;
+    transition: color 0.15s ease, background 0.15s ease;
+  }
+
+  .theme-toggle button svg { width: 14px; height: 14px; display: block; }
+
+  .theme-toggle button.active {
+    color: var(--text);
+    background: var(--line);
+  }
+
+  .panel-body {
+    flex: 1;
+    padding: 20px 22px;
+  }
+
+  /* ---------- Empty state ---------- */
+  .empty-state {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    padding-top: 30px;
+    color: var(--text-dim);
+  }
+
+  .empty-state .glyph {
+    font-family: var(--serif);
+    font-style: italic;
+    font-size: 15px;
+    color: var(--text-faint);
+    margin-bottom: 14px;
+  }
+
+  .empty-state p {
+    font-size: 13px;
+    line-height: 1.7;
+    margin: 0 0 10px;
+  }
+
+  /* ---------- Loading ---------- */
+  .loading-state {
+    padding-top: 30px;
+    color: var(--text-dim);
+    font-size: 13px;
+  }
+  .loading-dots::after {
+    content: '';
+    animation: dots 1.2s steps(4, end) infinite;
+  }
+  @keyframes dots {
+    0%, 20% { content: ''; }
+    40% { content: '.'; }
+    60% { content: '..'; }
+    80%, 100% { content: '...'; }
+  }
+
+  /* ---------- Error ---------- */
+  .error-state {
+    padding-top: 30px;
+    color: var(--risk-alto);
+    font-size: 13px;
+    line-height: 1.6;
+  }
+
+  /* ---------- Result ---------- */
+  .coords {
+    font-size: 12px;
+    color: var(--text-faint);
+    margin-bottom: 18px;
+    letter-spacing: 0.02em;
+  }
+
+  .risk-badge {
+    display: inline-flex;
+    align-items: baseline;
+    gap: 8px;
+    padding: 10px 14px;
+    border-radius: 3px;
+    margin-bottom: 22px;
+    border: 1px solid transparent;
+  }
+
+  .risk-badge .label {
+    font-family: var(--serif);
+    font-size: 19px;
+    font-weight: 600;
+  }
+
+  .risk-badge .puntaje {
+    font-size: 11px;
+    opacity: 0.75;
+  }
+
+  .risk-badge.alto { background: var(--risk-alto-bg); color: var(--risk-alto); border-color: var(--risk-alto); }
+  .risk-badge.moderado { background: var(--risk-moderado-bg); color: var(--risk-moderado); border-color: var(--risk-moderado); }
+  .risk-badge.bajo { background: var(--risk-bajo-bg); color: var(--risk-bajo); border-color: var(--risk-bajo); }
+
+  /* ---------- Stratigraphic column (signature element) ---------- */
+  .strata-section {
+    margin-bottom: 24px;
+  }
+
+  .section-label {
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    color: var(--text-faint);
+    margin-bottom: 10px;
+  }
+
+  .strata-column {
+    display: flex;
+    gap: 5px;
+    height: 88px;
+    margin-bottom: 12px;
+  }
+
+  .stratum-track {
+    flex: 1;
+    border-radius: 2px;
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-end;
+    position: relative;
+    border: 1px solid var(--line);
+    background: var(--panel-raised);
+    overflow: hidden;
+  }
+
+  .stratum-fill {
+    width: 100%;
+    transition: height 0.4s ease;
+    display: flex;
+    align-items: flex-start;
+    justify-content: center;
+    padding-top: 4px;
+  }
+
+  .stratum-fill[data-tier="bajo"] { background: var(--risk-bajo-bg); border-top: 2px solid var(--risk-bajo); }
+  .stratum-fill[data-tier="medio"] { background: var(--risk-moderado-bg); border-top: 2px solid var(--risk-moderado); }
+  .stratum-fill[data-tier="alto"] { background: var(--risk-alto-bg); border-top: 2px solid var(--risk-alto); }
+
+  .stratum-pct {
+    font-size: 9px;
+    color: var(--text);
+    font-weight: 500;
+  }
+
+  .stratum-label {
+    position: absolute;
+    bottom: 4px;
+    left: 0;
+    right: 0;
+    text-align: center;
+    font-size: 8.5px;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--text-faint);
+  }
+
+  .silencio-note {
+    font-size: 11.5px;
+    line-height: 1.6;
+    color: var(--text-dim);
+    background: var(--panel-raised);
+    border: 1px solid var(--line);
+    border-left: 2px solid var(--risk-moderado);
+    border-radius: 2px;
+    padding: 10px 12px;
+    margin-top: 10px;
+  }
+
+  .factores-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+  }
+
+  .factores-list li {
+    font-size: 12.5px;
+    line-height: 1.6;
+    color: var(--text);
+    padding: 9px 0;
+    border-top: 1px solid var(--line);
+  }
+
+  .factores-list li:first-child { border-top: none; }
+
+  /* ---------- Detail sections ---------- */
+  .detail-section {
+    margin-bottom: 20px;
+  }
+
+  .detail-section h3 {
+    font-family: var(--serif);
+    font-weight: 500;
+    font-style: italic;
+    font-size: 14px;
+    margin: 0 0 8px;
+    color: var(--text-dim);
+  }
+
+  .detail-section p {
+    font-size: 12.5px;
+    line-height: 1.65;
+    color: var(--text);
+    margin: 0;
+  }
+
+  .rock-tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-top: 8px;
+  }
+
+  .rock-tag {
+    font-size: 11px;
+    padding: 3px 9px;
+    background: var(--panel-raised);
+    border: 1px solid var(--line);
+    border-radius: 20px;
+    color: var(--text-dim);
+  }
+
+  .event-row {
+    display: flex;
+    justify-content: space-between;
+    font-size: 11.5px;
+    padding: 6px 0;
+    border-top: 1px solid var(--line);
+    color: var(--text-dim);
+  }
+  .event-row:first-child { border-top: none; }
+  .event-row .mag { color: var(--text); font-weight: 500; }
+
+  /* ---------- Disclaimer ---------- */
+  .disclaimer {
+    padding: 16px 22px;
+    border-top: 1px solid var(--line);
+    background: var(--panel-raised);
+  }
+
+  .disclaimer p {
+    font-size: 10.5px;
+    line-height: 1.6;
+    color: var(--text-faint);
+    margin: 0;
+  }
+
+  /* ---------- Scrollbar ---------- */
+  #sidebar::-webkit-scrollbar { width: 8px; }
+  #sidebar::-webkit-scrollbar-track { background: var(--panel); }
+  #sidebar::-webkit-scrollbar-thumb { background: var(--line); border-radius: 4px; }
+
+  /* ---------- Mobile ---------- */
+  @media (max-width: 768px) {
+    #app {
+      grid-template-columns: 1fr;
+      grid-template-rows: 55vh 45vh;
+    }
+    #sidebar { border-left: none; border-top: 1px solid var(--line); }
+  }
+</style>
+</head>
+<body>
+
+<div id="app">
+  <div id="map"></div>
+
+  <div id="sidebar">
+    <div class="brand">
+      <div class="brand-text">
+        <h1>GeoRiesgo Chile</h1>
+        <p>Geología, fallas y sismicidad histórica por punto. Haz clic en cualquier lugar del mapa.</p>
+      </div>
+      <div class="theme-toggle" role="group" aria-label="Cambiar tema">
+        <button id="btn-theme-light" aria-label="Tema claro" onclick="setTheme('light')">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>
+        </button>
+        <button id="btn-theme-dark" aria-label="Tema oscuro" onclick="setTheme('dark')">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg>
+        </button>
+      </div>
+    </div>
+
+    <div class="panel-body" id="panel-body">
+      <div class="empty-state">
+        <div class="glyph">— sin selección —</div>
+        <p>Selecciona un punto en el mapa para consultar el tipo de roca, las fallas geológicas cercanas y los sismos históricos registrados en la zona.</p>
+      </div>
+    </div>
+
+    <div class="disclaimer">
+      <p>Los niveles de riesgo son una comparación relativa entre puntos de Chile, no una medida absoluta de peligro: todo el país es sísmicamente activo y toda construcción debe seguir la norma NCh433. Esta herramienta entrega información referencial construida a partir de datos públicos (SERNAGEOMIN, CSN, GEM). No constituye un estudio de mecánica de suelos ni asesoría profesional. Para cualquier proyecto de construcción, consulta a un ingeniero o geólogo habilitado.</p>
+    </div>
+  </div>
+</div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+  const API_BASE = "http://127.0.0.1:8000";
+
+  const RISK_COLORS_BY_THEME = {
+    dark: { Alto: "#cd6440", Moderado: "#d8ab5c", Bajo: "#6ba290" },
+    light: { Alto: "#b3502c", Moderado: "#a2792a", Bajo: "#3f7c69" },
+  };
+
+  const map = L.map('map', {
+    zoomControl: true,
+    attributionControl: true,
+  }).setView([-35.5, -71.5], 5);
+
+  // Tiles topográficos (relieve real, curvas de nivel) — el mismo origen sirve
+  // para ambos temas; el modo oscuro se logra con un filtro CSS sobre el pane.
+  L.tileLayer('https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png', {
+    attribution: 'Datos: &copy; OpenStreetMap contributors, SRTM | Estilo: &copy; OpenTopoMap (CC-BY-SA)',
+    subdomains: 'abc',
+    maxZoom: 17,
+  }).addTo(map);
+
+  let currentMarker = null;
+  let currentTheme = localStorage.getItem('georiesgo-theme') || 'dark';
+  let lastResult = null; // { lat, lng, data } — para re-render al cambiar de tema
+
+  function setTheme(theme) {
+    currentTheme = theme;
+    document.documentElement.setAttribute('data-theme', theme);
+    localStorage.setItem('georiesgo-theme', theme);
+    document.getElementById('btn-theme-light').classList.toggle('active', theme === 'light');
+    document.getElementById('btn-theme-dark').classList.toggle('active', theme === 'dark');
+    if (currentMarker && lastResult) {
+      ponerMarcador(lastResult.lat, lastResult.lng, RISK_COLORS_BY_THEME[theme][lastResult.data.nivel_riesgo]);
+    }
+  }
+
+  map.on('click', async (e) => {
+    const { lat, lng } = e.latlng;
+    consultarPunto(lat, lng);
+  });
+
+  function ponerMarcador(lat, lng, color) {
+    if (currentMarker) map.removeLayer(currentMarker);
+    currentMarker = L.circleMarker([lat, lng], {
+      radius: 9,
+      color: color || '#9299a6',
+      fillColor: color || '#9299a6',
+      fillOpacity: 0.85,
+      weight: 2,
+      className: 'risk-marker',
+    }).addTo(map);
+  }
+
+  function mostrarCargando() {
+    document.getElementById('panel-body').innerHTML = `
+      <div class="loading-state">
+        <span class="loading-dots">Consultando fuentes geológicas y sísmicas</span>
+      </div>
+    `;
+  }
+
+  function mostrarError(mensaje) {
+    document.getElementById('panel-body').innerHTML = `
+      <div class="error-state">
+        No se pudo obtener la información para este punto.<br><br>
+        ${mensaje}<br><br>
+        Verifica que el backend esté corriendo en <code>${API_BASE}</code>.
+      </div>
+    `;
+  }
+
+  async function consultarPunto(lat, lng) {
+    lastResult = null;
+    ponerMarcador(lat, lng, '#9299a6');
+    mostrarCargando();
+
+    try {
+      const resp = await fetch(`${API_BASE}/riesgo?lat=${lat}&lng=${lng}`);
+      if (!resp.ok) {
+        const err = await resp.json().catch(() => ({}));
+        throw new Error(err.detail || `HTTP ${resp.status}`);
+      }
+      const data = await resp.json();
+      lastResult = { lat, lng, data };
+      ponerMarcador(lat, lng, RISK_COLORS_BY_THEME[currentTheme][data.nivel_riesgo] || '#9299a6');
+      renderResultado(lat, lng, data);
+    } catch (err) {
+      mostrarError(err.message);
+    }
+  }
+
+  const CATEGORIA_LABEL = {
+    falla: 'Falla',
+    sismicidad_cortical: 'Sismo cortical',
+    sismicidad_subduccion: 'Subducción',
+    suelo: 'Suelo',
+  };
+
+  function tierDeNormalizado(n) {
+    if (n >= 0.67) return 'alto';
+    if (n >= 0.34) return 'medio';
+    return 'bajo';
+  }
+
+  function renderResultado(lat, lng, data) {
+    const nivel = data.nivel_riesgo;
+    const nivelClase = nivel.toLowerCase();
+    const geo = data.datos_crudos.geologia;
+    const fallas = data.datos_crudos.fallas_cercanas;
+    const sismosCorticales = data.datos_crudos.sismos_corticales_cercanos;
+    const sismosSubduccion = data.datos_crudos.sismos_subduccion_cercanos;
+
+    // Columna estratigráfica: relleno proporcional al valor normalizado (0-1)
+    // que calculó el backend — sin buckets discretos, la altura es la fórmula.
+    const estratos = data.factores.map(f => {
+      const alturaPct = Math.round(f.normalizado * 100);
+      const tier = tierDeNormalizado(f.normalizado);
+      return `
+        <div class="stratum-track">
+          <div class="stratum-fill" data-tier="${tier}" style="height:${alturaPct}%">
+            <span class="stratum-pct">${alturaPct}%</span>
+          </div>
+          <span class="stratum-label">${CATEGORIA_LABEL[f.categoria] || f.categoria}</span>
+        </div>
+      `;
+    }).join('');
+
+    // El factor de sismicidad cortical con normalizado 0 pero texto largo es la
+    // nota de "silencio sísmico" — se destaca aparte porque es información, no ruido
+    const notaSilencio = data.factores.find(
+      f => f.categoria === 'sismicidad_cortical' && f.normalizado === 0 && f.texto.includes('silencio sísmico')
+    );
+
+    const factoresHtml = data.factores.map(f => `<li>${f.texto}</li>`).join('');
+
+    const rocasHtml = (geo.rocas_dominantes && geo.rocas_dominantes.length)
+      ? `<div class="rock-tags">${geo.rocas_dominantes.map(r => `<span class="rock-tag">${r}</span>`).join('')}</div>`
+      : '';
+
+    const fallasHtml = fallas.length
+      ? fallas.slice(0, 4).map(f => `
+          <div class="event-row">
+            <span>${f.nombre}</span>
+            <span class="mag">${f.distancia_km} km</span>
+          </div>`).join('')
+      : `<p style="color: var(--text-faint); font-size: 12px;">Ninguna catalogada en 50 km.</p>`;
+
+    const corticalesHtml = sismosCorticales.length
+      ? sismosCorticales.slice(0, 5).map(s => `
+          <div class="event-row">
+            <span>${s.fecha.split(' ')[0]}</span>
+            <span class="mag">M${s.magnitud} · ${s.profundidad_km} km prof. · ${s.distancia_km} km</span>
+          </div>`).join('')
+      : `<p style="color: var(--text-faint); font-size: 12px;">Sin eventos corticales (prof. &lt;30 km) registrados a menos de 30 km.</p>`;
+
+    const subduccionHtml = sismosSubduccion.length
+      ? sismosSubduccion.slice(0, 5).map(s => `
+          <div class="event-row">
+            <span>${s.fecha.split(' ')[0]}</span>
+            <span class="mag">M${s.magnitud} · ${s.profundidad_km} km prof. · ${s.distancia_km} km</span>
+          </div>`).join('')
+      : `<p style="color: var(--text-faint); font-size: 12px;">Sin eventos de subducción destacados a menos de 30 km.</p>`;
+
+    document.getElementById('panel-body').innerHTML = `
+      <div class="coords">${lat.toFixed(4)}° , ${lng.toFixed(4)}°</div>
+
+      <div class="risk-badge ${nivelClase}">
+        <span class="label">Riesgo ${nivel}</span>
+        <span class="puntaje">${data.score_pct}%</span>
+      </div>
+
+      <div class="strata-section">
+        <div class="section-label">Desglose — columna de factores</div>
+        <div class="strata-column">${estratos}</div>
+        <ul class="factores-list">${factoresHtml}</ul>
+        ${notaSilencio ? `<div class="silencio-note">📍 <strong>Silencio sísmico:</strong> ${notaSilencio.texto.replace('Sin sismicidad cortical instrumental registrada pese a la falla cercana. ', '')}</div>` : ''}
+      </div>
+
+      <div class="detail-section">
+        <h3>Geología del punto</h3>
+        <p>${geo.encontrado
+          ? (geo.ambiente || 'Sin clasificación de ambiente disponible')
+          : 'Sin datos geológicos para este punto exacto.'}
+          ${geo.periodo ? ` · ${geo.periodo}` : ''}</p>
+        ${rocasHtml}
+      </div>
+
+      <div class="detail-section">
+        <h3>Fallas cercanas</h3>
+        ${fallasHtml}
+      </div>
+
+      <div class="detail-section">
+        <h3>Sismicidad cortical (prof. &lt;30 km)</h3>
+        <p style="font-size: 11px; color: var(--text-faint); margin-bottom: 8px;">Los únicos eventos que podrían relacionarse con una falla superficial local.</p>
+        ${corticalesHtml}
+      </div>
+
+      <div class="detail-section">
+        <h3>Sismicidad de subducción (prof. ≥30 km)</h3>
+        <p style="font-size: 11px; color: var(--text-faint); margin-bottom: 8px;">Eventos profundos en la interfaz de placas — contexto regional, no atribuibles a fallas corticales.</p>
+        ${subduccionHtml}
+      </div>
+    `;
+  }
+
+  // Inicialización
+  setTheme(currentTheme);
+</script>
+
+</body>
+</html>
