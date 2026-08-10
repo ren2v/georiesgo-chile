@@ -534,10 +534,13 @@
     }).addTo(map);
   }
 
-  function mostrarCargando() {
+  function mostrarCargando(intento) {
+    const mensaje = intento > 1
+      ? `Despertando el servidor (esto puede tardar hasta un minuto la primera vez)`
+      : `Consultando fuentes geológicas y sísmicas`;
     document.getElementById('panel-body').innerHTML = `
       <div class="loading-state">
-        <span class="loading-dots">Consultando fuentes geológicas y sísmicas</span>
+        <span class="loading-dots">${mensaje}</span>
       </div>
     `;
   }
@@ -545,31 +548,50 @@
   function mostrarError(mensaje) {
     document.getElementById('panel-body').innerHTML = `
       <div class="error-state">
-        No se pudo obtener la información para este punto.<br><br>
+        No se pudo obtener la información para este punto tras varios intentos.<br><br>
         ${mensaje}<br><br>
-        Verifica que el backend esté corriendo en <code>${API_BASE}</code>.
+        El backend gratuito puede tardar en despertar — intenta hacer clic de nuevo en unos segundos.
       </div>
     `;
+  }
+
+  const MAX_INTENTOS = 4;
+  const ESPERA_ENTRE_INTENTOS_MS = 6000;
+
+  function esperar(ms) {
+    return new Promise(resolve => setTimeout(resolve, ms));
   }
 
   async function consultarPunto(lat, lng) {
     lastResult = null;
     ponerMarcador(lat, lng, '#9299a6');
-    mostrarCargando();
 
-    try {
-      const resp = await fetch(`${API_BASE}/riesgo?lat=${lat}&lng=${lng}`);
-      if (!resp.ok) {
-        const err = await resp.json().catch(() => ({}));
-        throw new Error(err.detail || `HTTP ${resp.status}`);
+    let ultimoError = null;
+
+    for (let intento = 1; intento <= MAX_INTENTOS; intento++) {
+      mostrarCargando(intento);
+      try {
+        const resp = await fetch(`${API_BASE}/riesgo?lat=${lat}&lng=${lng}`);
+        if (!resp.ok) {
+          const err = await resp.json().catch(() => ({}));
+          throw new Error(err.detail || `HTTP ${resp.status}`);
+        }
+        const data = await resp.json();
+        lastResult = { lat, lng, data };
+        ponerMarcador(lat, lng, RISK_COLORS_BY_THEME[currentTheme][data.nivel_riesgo] || '#9299a6');
+        renderResultado(lat, lng, data);
+        return; // éxito, no seguir reintentando
+      } catch (err) {
+        ultimoError = err;
+        // "Failed to fetch" = servidor dormido / sin responder aún — vale la pena
+        // reintentar. Otros errores (ej. fuera de Chile) no mejoran reintentando.
+        const esErrorDeRed = err.message.includes('Failed to fetch') || err.message.includes('NetworkError');
+        if (!esErrorDeRed || intento === MAX_INTENTOS) break;
+        await esperar(ESPERA_ENTRE_INTENTOS_MS);
       }
-      const data = await resp.json();
-      lastResult = { lat, lng, data };
-      ponerMarcador(lat, lng, RISK_COLORS_BY_THEME[currentTheme][data.nivel_riesgo] || '#9299a6');
-      renderResultado(lat, lng, data);
-    } catch (err) {
-      mostrarError(err.message);
     }
+
+    mostrarError(ultimoError ? ultimoError.message : 'Error desconocido');
   }
 
   const CATEGORIA_LABEL = {
