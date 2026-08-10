@@ -134,3 +134,22 @@ def test_evaluar_riesgo_no_contiene_nan_en_grid_nacional():
         for lng in lngs:
             resultado = geo.evaluar_riesgo(float(lat), float(lng))
             assert not _contiene_nan(resultado), f"NaN encontrado en ({lat}, {lng})"
+
+def test_geologia_sin_nan_tras_limpiar_en_todas_las_filas():
+    # Recorre las 16k+ filas reales del dataset (no solo un muestreo de
+    # coordenadas) para garantizar que ningún valor NaN se cuele en la
+    # respuesta, sin importar en qué polígono caiga el usuario.
+    columnas = ["ambiente", "periodos", "litoestratos", "litologia", "roca1", "roca2", "roca3", "roca4"]
+    for columna in columnas:
+        valores_limpios = geo.geologia[columna].apply(geo.limpiar)
+        assert not any(
+            isinstance(v, float) and math.isnan(v) for v in valores_limpios
+        ), f"Quedó un NaN sin limpiar en la columna '{columna}'"
+
+
+def test_fallas_sin_nan_tras_limpiar_en_todas_las_filas():
+    for columna in ["name", "slip_type"]:
+        valores_limpios = geo.fallas[columna].apply(geo.limpiar)
+        assert not any(
+            isinstance(v, float) and math.isnan(v) for v in valores_limpios
+        ), f"Quedó un NaN sin limpiar en la columna '{columna}'"

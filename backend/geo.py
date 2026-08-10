@@ -24,13 +24,16 @@ EXPANSION_ROCA = {
 
 
 def limpiar(valor):
-    """Convierte NaN/NA de pandas a None. Necesario porque algunas columnas
-    con datos faltantes devuelven float('nan') en vez de None, y NaN no es
+    """Convierte cualquier variante de NaN/None/NA de pandas a None. Necesario
+    porque columnas con datos faltantes pueden devolver distintos tipos de
+    'vacío' (numpy.float64 nan, numpy.float32 nan, pandas.NA) según cómo se
+    haya inferido el tipo de esa columna al leer el archivo — y NaN no es
     válido en JSON estricto (rompe la respuesta con 500 en producción)."""
-    if valor is None:
-        return None
-    if isinstance(valor, float) and pd.isna(valor):
-        return None
+    try:
+        if pd.isna(valor):
+            return None
+    except (TypeError, ValueError):
+        pass
     return valor
 
 
