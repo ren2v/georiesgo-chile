@@ -23,7 +23,19 @@ EXPANSION_ROCA = {
 }
 
 
+def limpiar(valor):
+    """Convierte NaN/NA de pandas a None. Necesario porque algunas columnas
+    con datos faltantes devuelven float('nan') en vez de None, y NaN no es
+    válido en JSON estricto (rompe la respuesta con 500 en producción)."""
+    if valor is None:
+        return None
+    if isinstance(valor, float) and pd.isna(valor):
+        return None
+    return valor
+
+
 def expandir(codigo):
+    codigo = limpiar(codigo)
     if codigo is None:
         return None
     return EXPANSION_ROCA.get(codigo, codigo)
@@ -42,11 +54,11 @@ def consultar_geologia(lat: float, lng: float) -> dict:
 
     return {
         "encontrado": True,
-        "ambiente": fila.get("ambiente"),
-        "periodo": fila.get("periodos"),
+        "ambiente": limpiar(fila.get("ambiente")),
+        "periodo": limpiar(fila.get("periodos")),
         "rocas_dominantes": rocas,
-        "litoestratos": fila.get("litoestratos"),
-        "descripcion": fila.get("litologia"),
+        "litoestratos": limpiar(fila.get("litoestratos")),
+        "descripcion": limpiar(fila.get("litologia")),
     }
 
 

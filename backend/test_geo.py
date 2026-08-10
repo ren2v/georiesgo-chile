@@ -1,3 +1,4 @@
+import math
 import pytest
 import geo
 
@@ -85,3 +86,40 @@ def test_consultar_sismos_filtra_por_profundidad():
         -33.45, -70.65, radio_km=100, min_magnitud=4.0, profundidad_max=30
     )
     assert all(s["profundidad_km"] <= 30 for s in corticales)
+
+
+# ---------------------------------------------------------------------------
+# Regresión: bug de NaN rompiendo la serialización JSON en producción
+# ---------------------------------------------------------------------------
+
+def _contiene_nan(obj):
+    """Recorre recursivamente dicts/listas buscando algún float NaN, que
+    rompería la serialización JSON con allow_nan=False (como hace FastAPI)."""
+    if isinstance(obj, float):
+        return math.isnan(obj)
+    if isinstance(obj, dict):
+        return any(_contiene_nan(v) for v in obj.values())
+    if isinstance(obj, list):
+        return any(_contiene_nan(v) for v in obj)
+    return False
+
+
+def test_evaluar_riesgo_no_contiene_nan_region_biobio():
+    # Regresión: este punto (Región del Biobío) rompía la respuesta en
+    # producción porque un polígono geológico sin roca3/roca4 devolvía
+    # NaN de pandas en vez de None, lo cual no es válido en JSON.
+    resultado = geo.evaluar_riesgo(-37.097048852585345, -72.49674767725125)
+    assert not _contiene_nan(resultado)
+
+
+def test_consultar_geologia_no_contiene_nan_en_varios_puntos():
+    puntos = [
+        (-18.47, -70.30),   # Arica, extremo norte
+        (-33.45, -70.65),   # Santiago
+        (-37.10, -72.50),   # Biobío (punto que causó el bug)
+        (-41.47, -72.94),   # Puerto Montt
+        (-53.16, -70.91),   # Punta Arenas
+    ]
+    for lat, lng in puntos:
+        resultado = geo.consultar_geologia(lat, lng)
+        assert not _contiene_nan(resultado)
