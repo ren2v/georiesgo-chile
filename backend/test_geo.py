@@ -1,4 +1,5 @@
 import math
+import numpy as np
 import pytest
 import geo
 
@@ -61,16 +62,12 @@ def test_evaluar_riesgo_devuelve_nivel_valido():
 
 
 def test_mas_cerca_de_la_falla_implica_mayor_normalizado():
-    # A igualdad de otros factores, estar más cerca de una falla nunca debería
-    # dar un normalizado menor — es la propiedad que hace que el modelo tenga
-    # sentido físico, no solo que "dé resultados razonables" en los puntos que probamos.
     lejos = geo.normalizar_distancia_falla(25)
     cerca = geo.normalizar_distancia_falla(5)
     assert cerca > lejos
 
 
 def test_consultar_geologia_en_el_oceano_no_encuentra_datos():
-    # Punto en el Pacífico, lejos de la costa — no debería haber polígono geológico
     resultado = geo.consultar_geologia(-33.0, -80.0)
     assert resultado["encontrado"] is False
 
@@ -89,12 +86,10 @@ def test_consultar_sismos_filtra_por_profundidad():
 
 
 # ---------------------------------------------------------------------------
-# Regresión: bug de NaN rompiendo la serialización JSON en producción
+# Regresión: NaN de pandas colándose en la respuesta JSON.
 # ---------------------------------------------------------------------------
 
 def _contiene_nan(obj):
-    """Recorre recursivamente dicts/listas buscando algún float NaN, que
-    rompería la serialización JSON con allow_nan=False (como hace FastAPI)."""
     if isinstance(obj, float):
         return math.isnan(obj)
     if isinstance(obj, dict):
@@ -105,21 +100,37 @@ def _contiene_nan(obj):
 
 
 def test_evaluar_riesgo_no_contiene_nan_region_biobio():
-    # Regresión: este punto (Región del Biobío) rompía la respuesta en
-    # producción porque un polígono geológico sin roca3/roca4 devolvía
-    # NaN de pandas en vez de None, lo cual no es válido en JSON.
     resultado = geo.evaluar_riesgo(-37.097048852585345, -72.49674767725125)
     assert not _contiene_nan(resultado)
 
 
 def test_consultar_geologia_no_contiene_nan_en_varios_puntos():
     puntos = [
-        (-18.47, -70.30),   # Arica, extremo norte
-        (-33.45, -70.65),   # Santiago
-        (-37.10, -72.50),   # Biobío (punto que causó el bug)
-        (-41.47, -72.94),   # Puerto Montt
-        (-53.16, -70.91),   # Punta Arenas
+        (-18.47, -70.30),
+        (-33.45, -70.65),
+        (-37.10, -72.50),
+        (-41.47, -72.94),
+        (-53.16, -70.91),
     ]
     for lat, lng in puntos:
         resultado = geo.consultar_geologia(lat, lng)
         assert not _contiene_nan(resultado)
+
+
+def test_evaluar_riesgo_no_contiene_nan_casos_reportados():
+    puntos = [
+        (-37.92157216245872, -71.75560902325236),
+        (-31.73544126985597, -70.67270027583997),
+    ]
+    for lat, lng in puntos:
+        resultado = geo.evaluar_riesgo(lat, lng)
+        assert not _contiene_nan(resultado)
+
+
+def test_evaluar_riesgo_no_contiene_nan_en_grid_nacional():
+    lats = np.linspace(-55, -18, 8)
+    lngs = np.linspace(-75, -67, 4)
+    for lat in lats:
+        for lng in lngs:
+            resultado = geo.evaluar_riesgo(float(lat), float(lng))
+            assert not _contiene_nan(resultado), f"NaN encontrado en ({lat}, {lng})"

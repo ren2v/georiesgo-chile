@@ -73,9 +73,9 @@ def consultar_fallas_cercanas(lat: float, lng: float, radio_km: float = 50) -> l
 
     return [
         {
-            "nombre": row.get("name") or "Sin nombre catalogado",
+            "nombre": limpiar(row.get("name")) or "Sin nombre catalogado",
             "distancia_km": round(row["distancia_km"], 1),
-            "tipo_movimiento": row.get("slip_type"),
+            "tipo_movimiento": limpiar(row.get("slip_type")),
         }
         for _, row in cercanas.iterrows()
     ]
@@ -118,8 +118,8 @@ def consultar_sismos_cercanos(
     return [
         {
             "fecha": row["fecha"],
-            "magnitud": row["magnitud"],
-            "profundidad_km": row["profundidad_km"],
+            "magnitud": limpiar(row["magnitud"]),
+            "profundidad_km": limpiar(row["profundidad_km"]),
             "distancia_km": round(row["distancia_km"], 1),
         }
         for _, row in cercanos.iterrows()
