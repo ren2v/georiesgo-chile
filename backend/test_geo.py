@@ -116,14 +116,16 @@ def test_consultar_sismos_historicos_no_encuentra_nada_lejos_de_la_costa():
 
 def test_valdivia_captura_el_terremoto_de_1960_con_exposicion_alta():
     # El caso que motivó todo este rediseño: Valdivia está a distancia corta
-    # del epicentro de 1960 (M9.5, el mayor sismo jamás registrado) y ya
-    # superó la ventana de alivio post-ruptura, así que el factor de
-    # exposición debe reflejar eso con un valor alto — aunque la clasificación
-    # final ("Alto" vs "Moderado") también dependa de la geografía exacta de
-    # la costa, que es una decisión de diseño legítima y separada.
+    # del epicentro de 1960 (M9.5, el mayor sismo jamás registrado). Con la
+    # fórmula de alivio ponderada por magnitud, esto vuelve a clasificar
+    # "Alto" — no porque forzáramos ese resultado, sino como consecuencia de
+    # corregir un problema conceptual real (un M6.0 no debía "resetear" la
+    # urgencia igual que un M9.5). Si esto deja de cumplirse tras un cambio,
+    # investigar antes de simplemente subir el número.
     resultado = geo.evaluar_riesgo(-39.8142, -73.2459)
+    assert resultado["nivel_riesgo"] == "Alto"
     factor_exposicion = next(f for f in resultado["factores"] if f["categoria"] == "exposicion_subduccion")
-    assert factor_exposicion["normalizado"] >= 0.75
+    assert factor_exposicion["normalizado"] >= 0.85
 
 
 def test_piedemonte_es_alto_por_falla_extrema():

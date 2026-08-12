@@ -96,6 +96,7 @@ def consultar_distancia_costa(lat: float, lng: float) -> float:
     return float(distancias.min())
 
 
+
 def consultar_sismos_cercanos(
     lat: float,
     lng: float,
@@ -189,6 +190,45 @@ PESO_EXPOSICION_SUBDUCCION = 4
 PESO_SUELO = 2
 PESO_TOTAL = PESO_FALLA + PESO_CORTICAL + PESO_EXPOSICION_SUBDUCCION + PESO_SUELO
 
+# Zonas de la costa identificadas por sismólogos como de energía acumulada
+# significativa ("lagunas sísmicas" con nombre propio, no solo inferidas por
+# nuestra heurística genérica). Basado en el análisis del geógrafo Marcelo
+# Lagos (Pontificia Universidad Católica de Chile), entrevista en Radio
+# Agricultura tras el sismo de Colombia de 2025. Rangos de latitud
+# aproximados a partir de las localidades mencionadas — no son polígonos
+# oficiales, son una referencia adicional, no un reemplazo del cálculo.
+# Nota: esto es evidencia cualitativa citada, no se usa para modificar el
+# puntaje — mismo criterio que las demás notas informativas del modelo.
+ZONAS_ACUMULACION_EXPERTA = [
+    {
+        "nombre": "Pisagua al límite con Perú",
+        "lat_norte": -18.0, "lat_sur": -19.7,
+        "nota": "Sin terremotos importantes documentados en mucho tiempo.",
+    },
+    {
+        "nombre": "Punta Patache a Tocopilla",
+        "lat_norte": -20.8, "lat_sur": -22.3,
+        "nota": "Sin terremotos importantes documentados en mucho tiempo.",
+    },
+    {
+        "nombre": "Costa de Atacama",
+        "lat_norte": -26.0, "lat_sur": -29.0,
+        "nota": "Más de un siglo desde la última liberación de energía relevante (~1922).",
+    },
+    {
+        "nombre": "Los Vilos a Pichilemu",
+        "lat_norte": -31.9, "lat_sur": -34.4,
+        "nota": "Solo eventos puntuales hacia la costa; energía acumulada hacia la trinchera.",
+    },
+    {
+        "nombre": "Tirúa al sur (Golfo de Arauco)",
+        "lat_norte": -37.5, "lat_sur": -39.5,
+        "nota": "Más de 60 años desde el evento de 1960; no comparable en magnitud, pero un sismo M~8 es plausible según el experto.",
+    },
+]
+
+FUENTE_ZONAS_EXPERTA = "Marcelo Lagos (PUC), entrevista en Radio Agricultura"
+
 UMBRAL_ALTO_PCT = 60
 UMBRAL_MODERADO_PCT = 30
 
@@ -233,10 +273,11 @@ def obtener_anio_evento(evento: dict) -> int:
 
 
 def normalizar_laguna_sismica(anios_desde_ultimo_evento: float) -> float:
-    """0.0 justo después de una ruptura (alivio temporal de tensión), 1.0 al
-    cumplir o superar la ventana de alivio — de ahí en adelante se trata como
-    'sin alivio reciente', sin seguir subiendo (no extrapolamos más allá)."""
+    """Componente puramente temporal: 0.0 justo después de un evento, 1.0 al
+    cumplir la ventana de alivio. Se combina con la magnitud del evento en
+    evaluar_riesgo — ver el comentario junto a esa combinación."""
     return max(0.0, min(1.0, anios_desde_ultimo_evento / VENTANA_ALIVIO_POST_RUPTURA_ANIOS))
+
 
 
 def normalizar_magnitud(magnitud: float, base: float, techo: float = None) -> float:
@@ -255,6 +296,15 @@ def construir_factor(categoria: str, normalizado: float, peso_maximo: float, tex
         "contribucion": round(normalizado * peso_maximo, 3),
         "texto": texto,
     }
+
+
+def zona_acumulacion_experta(lat: float) -> dict:
+    """Busca si el punto cae dentro de una zona de acumulación de energía
+    identificada por un sismólogo (evidencia cualitativa citada, informativa)."""
+    for zona in ZONAS_ACUMULACION_EXPERTA:
+        if zona["lat_sur"] <= lat <= zona["lat_norte"]:
+            return zona
+    return None
 
 
 def evaluar_riesgo(lat: float, lng: float) -> dict:
@@ -332,7 +382,23 @@ def evaluar_riesgo(lat: float, lng: float) -> dict:
 
         anio_mas_reciente = max(obtener_anio_evento(e) for e in eventos_candidatos)
         anios_transcurridos = date.today().year - anio_mas_reciente
-        s_laguna = normalizar_laguna_sismica(anios_transcurridos)
+
+        # No todo evento "resetea" la urgencia por igual: un M6.0 apenas
+        # libera tensión relativa a la capacidad del segmento, mientras que
+        # un M9.5 sí la libera casi por completo. En vez de anotar a mano
+        # qué terremotos fueron rupturas "parciales" (dato que no tenemos
+        # con precisión, y que no queremos tener que mantener caso por caso),
+        # usamos la magnitud del evento más reciente para escalar qué tan
+        # efectivo fue ese alivio — se generaliza solo a cualquier terremoto
+        # futuro que entre al catálogo o a la tabla histórica.
+        magnitud_evento_reciente = max(
+            e["magnitud"] for e in eventos_candidatos if obtener_anio_evento(e) == anio_mas_reciente
+        )
+        efectividad_alivio = normalizar_magnitud(
+            magnitud_evento_reciente, base=MAGNITUD_BASE_SUBDUCCION_GRANDE, techo=MAGNITUD_TECHO_SUBDUCCION_GRANDE
+        )
+        s_laguna_por_tiempo = normalizar_laguna_sismica(anios_transcurridos)
+        s_laguna = 1 - (1 - s_laguna_por_tiempo) * efectividad_alivio
     else:
         mayor_sub = None
         s_magnitud_sub = 0.0
@@ -349,9 +415,9 @@ def evaluar_riesgo(lat: float, lng: float) -> dict:
     if mayor_sub is not None:
         texto += f"; mayor sismo de interfaz en {RADIO_SUBDUCCION_GRANDE_KM} km: M{mayor_sub} (registro {fuente})"
         texto += (
-            f"; {anios_transcurridos} años desde el evento más reciente documentado "
-            f"(ventana de alivio post-ruptura {VENTANA_ALIVIO_POST_RUPTURA_ANIOS} años — "
-            f"factor de laguna sísmica {s_laguna:.2f})"
+            f"; {anios_transcurridos} años desde el evento más reciente documentado (M{magnitud_evento_reciente}, "
+            f"efectividad de alivio {efectividad_alivio:.2f} según su magnitud) "
+            f"— factor de laguna sísmica resultante {s_laguna:.2f}"
         )
     else:
         texto += f"; sin sismos de interfaz M≥{MAGNITUD_BASE_SUBDUCCION_GRANDE} registrados en {RADIO_SUBDUCCION_GRANDE_KM} km"
@@ -384,6 +450,18 @@ def evaluar_riesgo(lat: float, lng: float) -> dict:
             f"Punto costero (a {distancia_costa_km} km del mar). Este modelo no calcula riesgo de "
             "inundación por tsunami porque requiere datos de elevación que no tenemos disponibles. "
             "Consulta las cartas oficiales de inundación por tsunami del SHOA para este sector."
+        ))
+
+    # Nota informativa (no afecta el puntaje): si el punto cae en una zona que
+    # un sismólogo identificó explícitamente como de energía acumulada
+    # significativa, lo mostramos como evidencia adicional citada — no como
+    # parte del cálculo, para no mezclar una fuente cualitativa con el modelo.
+    zona_experta = zona_acumulacion_experta(lat)
+    if zona_experta:
+        factores.append(construir_factor(
+            "zona_experta", 0.0, 0,
+            f"Zona identificada por sismólogos con energía acumulada significativa: "
+            f"'{zona_experta['nombre']}'. {zona_experta['nota']} (Fuente: {FUENTE_ZONAS_EXPERTA})"
         ))
 
     contribucion_total = sum(f["contribucion"] for f in factores)
