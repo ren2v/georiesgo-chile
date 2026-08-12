@@ -2,6 +2,7 @@ import geopandas as gpd
 import pandas as pd
 import numpy as np
 from pathlib import Path
+from datetime import date
 from shapely.geometry import Point
 
 # Rutas resueltas según la ubicación de este archivo, no según el directorio
@@ -158,6 +159,16 @@ MAGNITUD_TECHO_SUBDUCCION_GRANDE = 9.5  # Valdivia 1960, el mayor jamás registr
 
 UMBRAL_TSUNAMI_KM = 10  # bajo esta distancia, se agrega nota informativa (no puntaje)
 
+# "Laguna sísmica": un segmento que rompió hace poco liberó tensión reciente.
+# En vez de asumir un ciclo de recurrencia completo por segmento (que no
+# conocemos con confianza para cada uno), usamos una ventana de alivio
+# temporal post-ruptura más conservadora: durante ~30 años tras un gran
+# sismo, tratamos el segmento como de urgencia algo menor; pasado eso,
+# volvemos a evaluarlo por su exposición geográfica/histórica de base, sin
+# extrapolar "más tiempo sin romper = más peligroso" sin evidencia específica
+# del segmento — esa extrapolación sí requeriría el ciclo real, que no tenemos.
+VENTANA_ALIVIO_POST_RUPTURA_ANIOS = 30
+
 # El catálogo instrumental del CSN (evtdb) parte en 2012 — no incluye los
 # grandes terremotos de subducción del siglo XX ni la década de 2010, que son
 # precisamente los más relevantes para estimar exposición a la fosa. Esta
@@ -213,6 +224,19 @@ def normalizar_exposicion_costa(distancia_km: float) -> float:
     Aproxima la exposición a la fosa de subducción, que corre mar adentro
     paralela a toda la costa chilena."""
     return max(0.0, 1 - distancia_km / RADIO_EXPOSICION_COSTA_KM)
+
+
+def obtener_anio_evento(evento: dict) -> int:
+    """Extrae el año de un evento, sea de la tabla histórica ('fecha': 'YYYY-MM-DD')
+    o del catálogo instrumental ('fecha': 'YYYY-MM-DD HH:MM:SS')."""
+    return int(evento["fecha"][:4])
+
+
+def normalizar_laguna_sismica(anios_desde_ultimo_evento: float) -> float:
+    """0.0 justo después de una ruptura (alivio temporal de tensión), 1.0 al
+    cumplir o superar la ventana de alivio — de ahí en adelante se trata como
+    'sin alivio reciente', sin seguir subiendo (no extrapolamos más allá)."""
+    return max(0.0, min(1.0, anios_desde_ultimo_evento / VENTANA_ALIVIO_POST_RUPTURA_ANIOS))
 
 
 def normalizar_magnitud(magnitud: float, base: float, techo: float = None) -> float:
@@ -295,26 +319,40 @@ def evaluar_riesgo(lat: float, lng: float) -> dict:
     # magnitud del mayor sismo de interfaz documentado en un radio amplio.
     s_costa = normalizar_exposicion_costa(distancia_costa_km)
 
-    magnitudes_candidatas = [s["magnitud"] for s in sismos_subduccion_grandes]
-    magnitudes_candidatas += [e["magnitud"] for e in sismos_historicos]
+    eventos_candidatos = sismos_subduccion_grandes + sismos_historicos
 
-    if magnitudes_candidatas:
-        mayor_sub = max(magnitudes_candidatas)
+    if eventos_candidatos:
+        mayor_sub = max(e["magnitud"] for e in eventos_candidatos)
         s_magnitud_sub = normalizar_magnitud(
             mayor_sub, base=MAGNITUD_BASE_SUBDUCCION_GRANDE, techo=MAGNITUD_TECHO_SUBDUCCION_GRANDE
         )
         fuente = "histórico" if sismos_historicos and mayor_sub == max(
             [e["magnitud"] for e in sismos_historicos], default=-1
         ) else "instrumental"
+
+        anio_mas_reciente = max(obtener_anio_evento(e) for e in eventos_candidatos)
+        anios_transcurridos = date.today().year - anio_mas_reciente
+        s_laguna = normalizar_laguna_sismica(anios_transcurridos)
     else:
         mayor_sub = None
         s_magnitud_sub = 0.0
         fuente = None
+        anios_transcurridos = None
+        # Sin ningún evento de subducción documentado en el radio: no sabemos
+        # si es porque genuinamente no hay actividad, o porque nuestra tabla
+        # (6 eventos) y el catálogo (desde 2012) simplemente no lo cubren.
+        # Neutral, no penalizamos ni premiamos una ausencia de datos.
+        s_laguna = 0.5
 
-    s_exposicion = 0.7 * s_costa + 0.3 * s_magnitud_sub
+    s_exposicion = 0.6 * s_costa + 0.2 * s_magnitud_sub + 0.2 * s_laguna
     texto = f"A {distancia_costa_km} km de la costa (proxy de la fosa de subducción)"
     if mayor_sub is not None:
         texto += f"; mayor sismo de interfaz en {RADIO_SUBDUCCION_GRANDE_KM} km: M{mayor_sub} (registro {fuente})"
+        texto += (
+            f"; {anios_transcurridos} años desde el evento más reciente documentado "
+            f"(ventana de alivio post-ruptura {VENTANA_ALIVIO_POST_RUPTURA_ANIOS} años — "
+            f"factor de laguna sísmica {s_laguna:.2f})"
+        )
     else:
         texto += f"; sin sismos de interfaz M≥{MAGNITUD_BASE_SUBDUCCION_GRANDE} registrados en {RADIO_SUBDUCCION_GRANDE_KM} km"
     factores.append(construir_factor("exposicion_subduccion", s_exposicion, PESO_EXPOSICION_SUBDUCCION, texto))
