@@ -2,4 +2,4 @@ venv/
 __pycache__/
 *.pyc
 .pytest_cache/
-.env
+.envdata/costa/coastline_world.geojson 
