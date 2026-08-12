@@ -21,6 +21,18 @@ def test_normalizar_distancia_falla_punto_medio():
     assert geo.normalizar_distancia_falla(mitad) == pytest.approx(0.5)
 
 
+def test_normalizar_exposicion_costa_en_la_costa():
+    assert geo.normalizar_exposicion_costa(0) == 1.0
+
+
+def test_normalizar_exposicion_costa_en_el_limite():
+    assert geo.normalizar_exposicion_costa(geo.RADIO_EXPOSICION_COSTA_KM) == 0.0
+
+
+def test_normalizar_exposicion_costa_mas_alla_del_limite_no_es_negativo():
+    assert geo.normalizar_exposicion_costa(geo.RADIO_EXPOSICION_COSTA_KM * 3) == 0.0
+
+
 def test_normalizar_magnitud_en_la_base_es_cero():
     assert geo.normalizar_magnitud(4.0, base=4.0) == 0.0
 
@@ -85,6 +97,53 @@ def test_consultar_sismos_filtra_por_profundidad():
     assert all(s["profundidad_km"] <= 30 for s in corticales)
 
 
+def test_consultar_distancia_costa_punto_costero_menor_que_inland():
+    dist_costero = geo.consultar_distancia_costa(-33.03, -71.63)   # Valparaíso, en la costa
+    dist_inland = geo.consultar_distancia_costa(-22.91, -68.20)    # San Pedro de Atacama
+    assert dist_costero < dist_inland
+
+
+def test_consultar_sismos_historicos_encuentra_valdivia_1960_cerca_de_valdivia():
+    eventos = geo.consultar_sismos_historicos_cercanos(-39.8142, -73.2459)
+    nombres = [e["nombre"] for e in eventos]
+    assert "Valdivia 1960" in nombres
+
+
+def test_consultar_sismos_historicos_no_encuentra_nada_lejos_de_la_costa():
+    eventos = geo.consultar_sismos_historicos_cercanos(-22.91, -68.20)  # San Pedro, interior
+    assert eventos == []
+
+
+def test_valdivia_es_alto_por_exposicion_extrema_a_subduccion():
+    # El caso que motivó todo este rediseño: Valdivia no tiene una falla
+    # cortical cercana, pero está a pocos km de la costa y a distancia corta
+    # del epicentro de 1960 (M9.5, el mayor sismo jamás registrado). Debe
+    # clasificar "Alto" por la regla de anulación de amenaza extrema aislada,
+    # no por la suma ponderada normal.
+    resultado = geo.evaluar_riesgo(-39.8142, -73.2459)
+    assert resultado["nivel_riesgo"] == "Alto"
+    factor_exposicion = next(f for f in resultado["factores"] if f["categoria"] == "exposicion_subduccion")
+    assert factor_exposicion["normalizado"] >= geo.UMBRAL_FACTOR_EXTREMO
+
+
+def test_piedemonte_es_alto_por_falla_extrema():
+    # Punto a ~2km de la Falla San Ramón — debe seguir siendo "Alto" por su
+    # propia vía (falla extrema), sin depender del factor de subducción.
+    resultado = geo.evaluar_riesgo(-33.45, -70.54)
+    assert resultado["nivel_riesgo"] == "Alto"
+    factor_falla = next(f for f in resultado["factores"] if f["categoria"] == "falla")
+    assert factor_falla["normalizado"] >= geo.UMBRAL_FACTOR_EXTREMO
+
+
+def test_san_pedro_no_activa_anulacion_por_amenaza_extrema():
+    # Punto sin falla cercana y lejos de la costa — no debería activar la
+    # anulación por amenaza extrema aislada, y debe quedar en "Bajo".
+    resultado = geo.evaluar_riesgo(-22.91, -68.20)
+    assert resultado["nivel_riesgo"] == "Bajo"
+    categorias = [f["categoria"] for f in resultado["factores"]]
+    assert "anulacion_alto" not in categorias
+
+
 # ---------------------------------------------------------------------------
 # Regresión: NaN de pandas colándose en la respuesta JSON.
 # ---------------------------------------------------------------------------
@@ -135,10 +194,8 @@ def test_evaluar_riesgo_no_contiene_nan_en_grid_nacional():
             resultado = geo.evaluar_riesgo(float(lat), float(lng))
             assert not _contiene_nan(resultado), f"NaN encontrado en ({lat}, {lng})"
 
+
 def test_geologia_sin_nan_tras_limpiar_en_todas_las_filas():
-    # Recorre las 16k+ filas reales del dataset (no solo un muestreo de
-    # coordenadas) para garantizar que ningún valor NaN se cuele en la
-    # respuesta, sin importar en qué polígono caiga el usuario.
     columnas = ["ambiente", "periodos", "litoestratos", "litologia", "roca1", "roca2", "roca3", "roca4"]
     for columna in columnas:
         valores_limpios = geo.geologia[columna].apply(geo.limpiar)

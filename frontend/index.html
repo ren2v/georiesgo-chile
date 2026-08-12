@@ -597,8 +597,14 @@
   const CATEGORIA_LABEL = {
     falla: 'Falla',
     sismicidad_cortical: 'Sismo cortical',
-    sismicidad_subduccion: 'Subducción',
+    exposicion_subduccion: 'Subducción',
     suelo: 'Suelo',
+  };
+
+  const NOTA_ICONO = {
+    sismicidad_cortical: '📍',
+    tsunami: '🌊',
+    anulacion_alto: '⚠️',
   };
 
   function tierDeNormalizado(n) {
@@ -613,11 +619,17 @@
     const geo = data.datos_crudos.geologia;
     const fallas = data.datos_crudos.fallas_cercanas;
     const sismosCorticales = data.datos_crudos.sismos_corticales_cercanos;
-    const sismosSubduccion = data.datos_crudos.sismos_subduccion_cercanos;
+    const sismosSubduccionGrandes = data.datos_crudos.sismos_subduccion_grandes;
+    const sismosHistoricos = data.datos_crudos.sismos_historicos_cercanos;
+    const distanciaCosta = data.datos_crudos.distancia_costa_km;
 
-    // Columna estratigráfica: relleno proporcional al valor normalizado (0-1)
-    // que calculó el backend — sin buckets discretos, la altura es la fórmula.
-    const estratos = data.factores.map(f => {
+    // Columna estratigráfica: solo los factores que realmente aportan puntaje
+    // (peso_maximo > 0). Las notas informativas (silencio sísmico, tsunami,
+    // anulación por amenaza extrema) se muestran aparte como texto, no como barra.
+    const factoresConPeso = data.factores.filter(f => f.peso_maximo > 0);
+    const notas = data.factores.filter(f => f.peso_maximo === 0);
+
+    const estratos = factoresConPeso.map(f => {
       const alturaPct = Math.round(f.normalizado * 100);
       const tier = tierDeNormalizado(f.normalizado);
       return `
@@ -630,11 +642,9 @@
       `;
     }).join('');
 
-    // El factor de sismicidad cortical con normalizado 0 pero texto largo es la
-    // nota de "silencio sísmico" — se destaca aparte porque es información, no ruido
-    const notaSilencio = data.factores.find(
-      f => f.categoria === 'sismicidad_cortical' && f.normalizado === 0 && f.texto.includes('silencio sísmico')
-    );
+    const notasHtml = notas.map(n => `
+      <div class="silencio-note">${NOTA_ICONO[n.categoria] || 'ℹ️'} ${n.texto}</div>
+    `).join('');
 
     const factoresHtml = data.factores.map(f => `<li>${f.texto}</li>`).join('');
 
@@ -658,13 +668,20 @@
           </div>`).join('')
       : `<p style="color: var(--text-faint); font-size: 12px;">Sin eventos corticales (prof. &lt;30 km) registrados a menos de 30 km.</p>`;
 
-    const subduccionHtml = sismosSubduccion.length
-      ? sismosSubduccion.slice(0, 5).map(s => `
+    // Combina catálogo instrumental (desde 2012) con la tabla curada de
+    // grandes terremotos históricos, marcando el origen de cada uno.
+    const eventosSubduccion = [
+      ...sismosHistoricos.map(e => ({ ...e, etiqueta: e.nombre, fuente: 'histórico' })),
+      ...sismosSubduccionGrandes.map(e => ({ ...e, etiqueta: e.fecha.split(' ')[0], fuente: 'instrumental' })),
+    ].sort((a, b) => b.magnitud - a.magnitud);
+
+    const subduccionHtml = eventosSubduccion.length
+      ? eventosSubduccion.slice(0, 6).map(s => `
           <div class="event-row">
-            <span>${s.fecha.split(' ')[0]}</span>
-            <span class="mag">M${s.magnitud} · ${s.profundidad_km} km prof. · ${s.distancia_km} km</span>
+            <span>${s.etiqueta} <span style="opacity:0.6;">(${s.fuente})</span></span>
+            <span class="mag">M${s.magnitud} · ${s.distancia_km} km</span>
           </div>`).join('')
-      : `<p style="color: var(--text-faint); font-size: 12px;">Sin eventos de subducción destacados a menos de 30 km.</p>`;
+      : `<p style="color: var(--text-faint); font-size: 12px;">Sin sismos de interfaz destacados en 200 km.</p>`;
 
     document.getElementById('panel-body').innerHTML = `
       <div class="coords">${lat.toFixed(4)}° , ${lng.toFixed(4)}°</div>
@@ -678,7 +695,7 @@
         <div class="section-label">Desglose — columna de factores</div>
         <div class="strata-column">${estratos}</div>
         <ul class="factores-list">${factoresHtml}</ul>
-        ${notaSilencio ? `<div class="silencio-note">📍 <strong>Silencio sísmico:</strong> ${notaSilencio.texto.replace('Sin sismicidad cortical instrumental registrada pese a la falla cercana. ', '')}</div>` : ''}
+        ${notasHtml}
       </div>
 
       <div class="detail-section">
@@ -702,8 +719,8 @@
       </div>
 
       <div class="detail-section">
-        <h3>Sismicidad de subducción (prof. ≥30 km)</h3>
-        <p style="font-size: 11px; color: var(--text-faint); margin-bottom: 8px;">Eventos profundos en la interfaz de placas — contexto regional, no atribuibles a fallas corticales.</p>
+        <h3>Exposición a la fosa de subducción</h3>
+        <p style="font-size: 11px; color: var(--text-faint); margin-bottom: 8px;">A ${distanciaCosta} km de la costa. Combina catálogo instrumental (desde 2012) con grandes terremotos históricos documentados.</p>
         ${subduccionHtml}
       </div>
     `;
