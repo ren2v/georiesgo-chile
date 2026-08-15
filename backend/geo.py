@@ -466,9 +466,13 @@ def evaluar_riesgo(lat: float, lng: float) -> dict:
         if zona_oficial:
             texto_tsunami = (
                 f"Punto costero (a {distancia_costa_km} km del mar). Según la Carta de Inundación "
-                f"por Tsunami oficial del SHOA ('{zona_oficial}'), este punto está dentro del área "
-                "de inundación máxima esperada modelada para esa localidad. Consulta la carta "
-                "completa en shoa.cl/php/citsu.php antes de cualquier decisión de construcción."
+                f"por Tsunami oficial del SHOA ('{zona_oficial}'), este punto queda dentro del área "
+                "que se inundaría en el escenario de peor caso modelado para esa localidad: un gran "
+                "terremoto de subducción frente a esa costa (basado en el mayor evento histórico "
+                "conocido, o uno extremo probable si no hay registro de uno igual de grande). No es "
+                "una zona que se inunde de forma rutinaria — es la referencia que usan los urbanistas "
+                "para planificación y rutas de evacuación. Consulta la carta completa en "
+                "shoa.cl/php/citsu.php antes de cualquier decisión de construcción."
             )
         else:
             texto_tsunami = (
