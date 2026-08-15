@@ -15,6 +15,7 @@ geologia = gpd.read_file(DATA_DIR / "geologia" / "geologia.geojson")
 fallas = gpd.read_file(DATA_DIR / "fallas" / "fallas_chile.geojson")
 sismos = pd.read_csv(DATA_DIR / "sismos" / "sismos_csn.csv")
 costa = gpd.read_file(DATA_DIR / "costa" / "costa_chile.geojson")
+tsunami_citsu = gpd.read_file(DATA_DIR / "tsunami" / "citsu_chile.geojson")
 
 EXPANSION_ROCA = {
     "metareni": "metareniscas",
@@ -298,6 +299,20 @@ def construir_factor(categoria: str, normalizado: float, peso_maximo: float, tex
     }
 
 
+def consultar_zona_inundacion_oficial(lat: float, lng: float):
+    """Busca si el punto cae dentro de una zona de inundación modelada
+    oficialmente por el SHOA (Cartas CITSU). Devuelve el nombre de la carta
+    si hay coincidencia, o None si no (lo que puede significar que la zona
+    no está cubierta, o que sí está cubierta pero el punto queda fuera del
+    área de inundación modelada — no distinguimos entre ambos casos, para
+    no afirmar más certeza de la que realmente tenemos)."""
+    punto = Point(lng, lat)
+    coincidencias = tsunami_citsu[tsunami_citsu.geometry.contains(punto)]
+    if coincidencias.empty:
+        return None
+    return coincidencias.iloc[0]["nombre"]
+
+
 def zona_acumulacion_experta(lat: float) -> dict:
     """Busca si el punto cae dentro de una zona de acumulación de energía
     identificada por un sismólogo (evidencia cualitativa citada, informativa)."""
@@ -441,16 +456,31 @@ def evaluar_riesgo(lat: float, lng: float) -> dict:
         texto = "Sin clasificación de suelo disponible para este punto exacto"
     factores.append(construir_factor("suelo", s_suelo, PESO_SUELO, texto))
 
-    # Nota informativa (no afecta el puntaje): sin datos de elevación no podemos
-    # calcular riesgo de inundación por tsunami con precisión — mejor ser
-    # honestos sobre esa limitación que fabricar un número que parezca exacto.
+    # Nota informativa (no afecta el puntaje): si el punto cae dentro de una
+    # zona de inundación oficialmente modelada por el SHOA (Cartas CITSU),
+    # lo decimos explícitamente citando la carta. Si no hay coincidencia,
+    # mantenemos el descargo honesto — no sabemos si es porque el sector no
+    # está cubierto o porque el SHOA lo modeló fuera del área de inundación.
     if distancia_costa_km < UMBRAL_TSUNAMI_KM:
-        factores.append(construir_factor(
-            "tsunami", 0.0, 0,
-            f"Punto costero (a {distancia_costa_km} km del mar). Este modelo no calcula riesgo de "
-            "inundación por tsunami porque requiere datos de elevación que no tenemos disponibles. "
-            "Consulta las cartas oficiales de inundación por tsunami del SHOA para este sector."
-        ))
+        zona_oficial = consultar_zona_inundacion_oficial(lat, lng)
+        if zona_oficial:
+            texto_tsunami = (
+                f"Punto costero (a {distancia_costa_km} km del mar). Según la Carta de Inundación "
+                f"por Tsunami oficial del SHOA ('{zona_oficial}'), este punto está dentro del área "
+                "de inundación máxima esperada modelada para esa localidad. Consulta la carta "
+                "completa en shoa.cl/php/citsu.php antes de cualquier decisión de construcción."
+            )
+        else:
+            texto_tsunami = (
+                f"Punto costero (a {distancia_costa_km} km del mar). Este modelo no calcula riesgo "
+                "real de inundación por tsunami por su cuenta: eso requiere modelamiento de olas, "
+                "batimetría y topografía detallada. El SHOA publica cartas oficiales (CITSU) para "
+                "71 localidades costeras — este punto no cayó dentro de ninguna zona mapeada en "
+                "nuestra copia de esas cartas (puede ser porque la localidad no está cubierta, o "
+                "porque el punto queda fuera del área modelada). Consulta shoa.cl/php/citsu.php "
+                "para revisar si existe una carta para este sector específico."
+            )
+        factores.append(construir_factor("tsunami", 0.0, 0, texto_tsunami))
 
     # Nota informativa (no afecta el puntaje): si el punto cae en una zona que
     # un sismólogo identificó explícitamente como de energía acumulada

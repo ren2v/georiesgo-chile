@@ -212,3 +212,22 @@ def test_fallas_sin_nan_tras_limpiar_en_todas_las_filas():
         assert not any(
             isinstance(v, float) and math.isnan(v) for v in valores_limpios
         ), f"Quedó un NaN sin limpiar en la columna '{columna}'"
+
+
+def test_consultar_zona_inundacion_oficial_encuentra_algo_en_zona_costera_poblada():
+    # Valparaíso está en la capa (confirmado como 'citsu_valparaiso_vinna').
+    # Probamos varios puntos cerca del borde costero/portuario porque las
+    # cartas CITSU modelan una franja específica, no toda la ciudad — no
+    # cualquier coordenada "de Valparaíso" cae dentro del polígono exacto.
+    candidatos = [
+        (-33.036, -71.627),  # cerca de Muelle Prat / Plaza Sotomayor
+        (-33.045, -71.625),  # zona portuaria
+        (-33.02, -71.55),    # Viña del Mar, borde costero
+    ]
+    encontrado = any(geo.consultar_zona_inundacion_oficial(lat, lng) for lat, lng in candidatos)
+    assert encontrado
+
+
+def test_consultar_zona_inundacion_oficial_no_encuentra_nada_lejos_de_la_costa():
+    resultado = geo.consultar_zona_inundacion_oficial(-22.91, -68.20)  # San Pedro, interior
+    assert resultado is None
