@@ -1,0 +1,18 @@
+# Solo backend/, conocimiento/ y requirements.txt entran a la imagen.
+.git
+.gitignore
+.claude
+.env
+.env.*
+venv/
+**/__pycache__/
+**/*.pyc
+**/.pytest_cache/
+data/
+frontend/
+evals/
+docker/
+*.md
+!conocimiento/*.md
+backend/test_*.py
+backend/benchmark_backends.py

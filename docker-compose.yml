@@ -1,3 +1,15 @@
+# Stack completo en local:
+#
+#   docker compose up -d db                  # solo la base (desarrollo con venv)
+#   docker compose --profile carga run --rm carga   # cargar datos + documentos del RAG
+#   docker compose up -d                     # base + API + frontend
+#
+# API en http://localhost:8000, frontend en http://localhost:8080.
+
+x-conexion-db: &conexion-db
+  # Dentro de la red de Compose la base se llama "db" y escucha en 5432.
+  DATABASE_URL: postgresql+psycopg2://georiesgo:georiesgo@db:5432/georiesgo
+
 services:
   db:
     build: docker/db
@@ -18,6 +30,46 @@ services:
       interval: 5s
       timeout: 5s
       retries: 10
+
+  # Job de carga: ETL de capas espaciales a PostGIS e indexación de
+  # conocimiento/ en pgvector. Solo corre bajo demanda (profile "carga").
+  carga:
+    build: .
+    image: georiesgo-api:local
+    profiles: [carga]
+    environment:
+      <<: *conexion-db
+    volumes:
+      - ./data:/app/data:ro
+    command: sh -c "python backend/cargar_postgis.py && python backend/agente/ingesta.py"
+    depends_on:
+      db:
+        condition: service_healthy
+
+  api:
+    build: .
+    image: georiesgo-api:local
+    container_name: georiesgo-api
+    environment:
+      <<: *conexion-db
+    # La API key del modelo (GOOGLE_API_KEY) sale de .env; sin ella la API
+    # funciona igual y /agente responde 503.
+    env_file:
+      - path: .env
+        required: false
+    ports:
+      - "8000:8000"
+    depends_on:
+      db:
+        condition: service_healthy
+
+  frontend:
+    image: nginx:1.29-alpine
+    container_name: georiesgo-frontend
+    volumes:
+      - ./frontend:/usr/share/nginx/html:ro
+    ports:
+      - "8080:80"
 
 volumes:
   pgdata:

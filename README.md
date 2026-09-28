@@ -14,11 +14,24 @@ datos. Se elige con la variable de entorno `GEORIESGO_BACKEND`:
 | `memoria` (defecto) | GeoPandas/Shapely sobre GeoJSON cargados al iniciar | Desarrollo rápido, sin dependencias |
 | `postgis` | SQL espacial en PostgreSQL + PostGIS con índices GIST | Producción: arranque instantáneo, sin ~80 MB por proceso |
 
+### Todo con Docker
+
+```bash
+docker compose up -d db
+docker compose --profile carga run --rm carga   # ETL + indexación del RAG (una vez)
+docker compose up -d                            # API en :8000, frontend en :8080
+```
+
+La imagen de la API (`Dockerfile`) es multi-etapa, corre sin root, trae el
+modelo de embeddings horneado (no depende de Hugging Face al arrancar) y usa
+el backend PostGIS, así que los GeoJSON de `data/` no van dentro: se montan
+solo en el job de carga.
+
 ### Levantar PostGIS
 
 ```bash
-docker compose up -d
-pip install -r requirements.txt
+docker compose up -d db
+pip install -r requirements-dev.txt
 python backend/cargar_postgis.py        # ETL: GeoJSON/CSV -> PostGIS
 GEORIESGO_BACKEND=postgis uvicorn main:app --app-dir backend
 ```

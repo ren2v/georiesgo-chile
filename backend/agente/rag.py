@@ -17,9 +17,10 @@ from langchain_core.documents import Document
 from langchain_core.embeddings import Embeddings
 from langchain_postgres import Column, PGEngine, PGVectorStore
 from langchain_text_splitters import MarkdownHeaderTextSplitter
+from sqlalchemy import text
 from sqlalchemy.ext.asyncio import create_async_engine
 
-from db import obtener_url
+from db import obtener_engine, obtener_url
 
 CARPETA_CONOCIMIENTO = Path(__file__).resolve().parents[2] / "conocimiento"
 TABLA = "conocimiento"
@@ -64,7 +65,11 @@ def obtener_pg_engine() -> PGEngine:
 
 
 def crear_tabla() -> None:
-    """Crea (o recrea desde cero) la tabla de vectores."""
+    """Crea (o recrea desde cero) la tabla de vectores. langchain-postgres no
+    crea la extensión pgvector, así que la creamos acá: en una base nueva
+    (Docker desde cero, Azure) la carga fallaría sin esto."""
+    with obtener_engine().begin() as conn:
+        conn.execute(text("CREATE EXTENSION IF NOT EXISTS vector"))
     obtener_pg_engine().init_vectorstore_table(
         TABLA,
         DIMENSIONES,

@@ -1,3 +1,4 @@
+# Dependencias de producción (las de tests están en requirements-dev.txt).
 # Versiones fijadas: una actualización sin fijar (pandas 2 -> 3) ya cambió
 # el comportamiento de Series.apply y rompió tests. Actualizar a propósito.
 
@@ -30,7 +31,3 @@ langchain-text-splitters==1.1.2
 fastembed==0.8.1
 psycopg[binary]==3.3.6
 pyyaml==6.0.3
-
-# Tests
-pytest==9.1.1
-httpx==0.28.1
