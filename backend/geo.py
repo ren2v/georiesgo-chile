@@ -1,3 +1,4 @@
+import os
 import geopandas as gpd
 import pandas as pd
 import numpy as np
@@ -5,46 +6,30 @@ from pathlib import Path
 from datetime import date
 from shapely.geometry import Point
 
+from formato import EXPANSION_ROCA, limpiar, expandir, formatear_geologia, formatear_falla, formatear_sismo
+
+# Origen de los datos espaciales:
+#   "memoria" (por defecto): GeoPandas carga los GeoJSON/CSV al iniciar y
+#             resuelve cada consulta en Python. No requiere base de datos.
+#   "postgis": las consultas se resuelven con SQL espacial en PostgreSQL/PostGIS
+#             (ver geo_postgis.py y cargar_postgis.py). Arranque instantáneo y
+#             sin ~80 MB de GeoJSON en memoria por cada proceso del servidor.
+BACKEND = os.getenv("GEORIESGO_BACKEND", "memoria").lower()
+if BACKEND not in ("memoria", "postgis"):
+    raise ValueError(f"GEORIESGO_BACKEND inválido: {BACKEND!r} (usa 'memoria' o 'postgis')")
+
 # Rutas resueltas según la ubicación de este archivo, no según el directorio
 # desde el que se ejecute — así funciona igual con `python geo.py`,
 # `pytest` desde cualquier carpeta, o un servidor de producción.
 BASE_DIR = Path(__file__).resolve().parent
 DATA_DIR = BASE_DIR.parent / "data"
 
-geologia = gpd.read_file(DATA_DIR / "geologia" / "geologia.geojson")
-fallas = gpd.read_file(DATA_DIR / "fallas" / "fallas_chile.geojson")
-sismos = pd.read_csv(DATA_DIR / "sismos" / "sismos_csn.csv")
-costa = gpd.read_file(DATA_DIR / "costa" / "costa_chile.geojson")
-tsunami_citsu = gpd.read_file(DATA_DIR / "tsunami" / "citsu_chile.geojson")
-
-EXPANSION_ROCA = {
-    "metareni": "metareniscas",
-    "monzodio": "monzodiorita",
-    "metapeli": "metapelitas",
-    "metasedi": "metasedimentos",
-    "granodio": "granodiorita",
-}
-
-
-def limpiar(valor):
-    """Convierte cualquier variante de NaN/None/NA de pandas a None. Necesario
-    porque columnas con datos faltantes pueden devolver distintos tipos de
-    'vacío' (numpy.float64 nan, numpy.float32 nan, pandas.NA) según cómo se
-    haya inferido el tipo de esa columna al leer el archivo — y NaN no es
-    válido en JSON estricto (rompe la respuesta con 500 en producción)."""
-    try:
-        if pd.isna(valor):
-            return None
-    except (TypeError, ValueError):
-        pass
-    return valor
-
-
-def expandir(codigo):
-    codigo = limpiar(codigo)
-    if codigo is None:
-        return None
-    return EXPANSION_ROCA.get(codigo, codigo)
+if BACKEND == "memoria":
+    geologia = gpd.read_file(DATA_DIR / "geologia" / "geologia.geojson")
+    fallas = gpd.read_file(DATA_DIR / "fallas" / "fallas_chile.geojson")
+    sismos = pd.read_csv(DATA_DIR / "sismos" / "sismos_csn.csv")
+    costa = gpd.read_file(DATA_DIR / "costa" / "costa_chile.geojson")
+    tsunami_citsu = gpd.read_file(DATA_DIR / "tsunami" / "citsu_chile.geojson")
 
 
 def consultar_geologia(lat: float, lng: float) -> dict:
@@ -54,18 +39,7 @@ def consultar_geologia(lat: float, lng: float) -> dict:
     if resultado.empty:
         return {"encontrado": False}
 
-    fila = resultado.iloc[0]
-    rocas = [expandir(fila.get(f"roca{i}")) for i in range(1, 5)]
-    rocas = [r for r in rocas if r]
-
-    return {
-        "encontrado": True,
-        "ambiente": limpiar(fila.get("ambiente")),
-        "periodo": limpiar(fila.get("periodos")),
-        "rocas_dominantes": rocas,
-        "litoestratos": limpiar(fila.get("litoestratos")),
-        "descripcion": limpiar(fila.get("litologia")),
-    }
+    return formatear_geologia(resultado.iloc[0])
 
 
 def consultar_fallas_cercanas(lat: float, lng: float, radio_km: float = 50) -> list:
@@ -77,14 +51,7 @@ def consultar_fallas_cercanas(lat: float, lng: float, radio_km: float = 50) -> l
 
     cercanas = fallas_proj[fallas_proj["distancia_km"] <= radio_km].sort_values("distancia_km")
 
-    return [
-        {
-            "nombre": limpiar(row.get("name")) or "Sin nombre catalogado",
-            "distancia_km": round(row["distancia_km"], 1),
-            "tipo_movimiento": limpiar(row.get("slip_type")),
-        }
-        for _, row in cercanas.iterrows()
-    ]
+    return [formatear_falla(row) for _, row in cercanas.iterrows()]
 
 
 def consultar_distancia_costa(lat: float, lng: float) -> float:
@@ -132,15 +99,7 @@ def consultar_sismos_cercanos(
 
     cercanos = cercanos.sort_values("fecha", ascending=False)
 
-    return [
-        {
-            "fecha": row["fecha"],
-            "magnitud": limpiar(row["magnitud"]),
-            "profundidad_km": limpiar(row["profundidad_km"]),
-            "distancia_km": round(row["distancia_km"], 1),
-        }
-        for _, row in cercanos.iterrows()
-    ]
+    return [formatear_sismo(row) for _, row in cercanos.iterrows()]
 
 
 # ---------------------------------------------------------------------------
@@ -320,6 +279,20 @@ def zona_acumulacion_experta(lat: float) -> dict:
         if zona["lat_sur"] <= lat <= zona["lat_norte"]:
             return zona
     return None
+
+
+if BACKEND == "postgis":
+    # Mismas firmas y mismo formato de salida que las versiones en memoria de
+    # arriba: evaluar_riesgo (y el resto del modelo) no sabe ni necesita saber
+    # de dónde vienen los datos. La paridad entre ambas se verifica en
+    # test_postgis.py.
+    from geo_postgis import (  # noqa: F811
+        consultar_geologia,
+        consultar_fallas_cercanas,
+        consultar_distancia_costa,
+        consultar_sismos_cercanos,
+        consultar_zona_inundacion_oficial,
+    )
 
 
 def evaluar_riesgo(lat: float, lng: float) -> dict:

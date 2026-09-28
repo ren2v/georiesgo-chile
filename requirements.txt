@@ -5,3 +5,8 @@ shapely
 pandas
 numpy
 requests
+sqlalchemy
+geoalchemy2
+psycopg2-binary
+pytest
+httpx

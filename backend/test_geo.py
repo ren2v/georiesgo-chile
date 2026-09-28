@@ -197,18 +197,23 @@ def test_evaluar_riesgo_no_contiene_nan_en_grid_nacional():
             assert not _contiene_nan(resultado), f"NaN encontrado en ({lat}, {lng})"
 
 
+@pytest.mark.skipif(geo.BACKEND != "memoria", reason="inspecciona los GeoDataFrames en memoria")
 def test_geologia_sin_nan_tras_limpiar_en_todas_las_filas():
     columnas = ["ambiente", "periodos", "litoestratos", "litologia", "roca1", "roca2", "roca3", "roca4"]
     for columna in columnas:
-        valores_limpios = geo.geologia[columna].apply(geo.limpiar)
+        # Lista por comprensión, no Series.apply: en pandas 3 las columnas de
+        # texto son dtype "str" y apply vuelve a convertir el None en NaN.
+        # En producción limpiar() se aplica valor a valor, igual que aquí.
+        valores_limpios = [geo.limpiar(v) for v in geo.geologia[columna]]
         assert not any(
             isinstance(v, float) and math.isnan(v) for v in valores_limpios
         ), f"Quedó un NaN sin limpiar en la columna '{columna}'"
 
 
+@pytest.mark.skipif(geo.BACKEND != "memoria", reason="inspecciona los GeoDataFrames en memoria")
 def test_fallas_sin_nan_tras_limpiar_en_todas_las_filas():
     for columna in ["name", "slip_type"]:
-        valores_limpios = geo.fallas[columna].apply(geo.limpiar)
+        valores_limpios = [geo.limpiar(v) for v in geo.fallas[columna]]
         assert not any(
             isinstance(v, float) and math.isnan(v) for v in valores_limpios
         ), f"Quedó un NaN sin limpiar en la columna '{columna}'"

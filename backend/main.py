@@ -44,7 +44,7 @@ def consultar_elevacion(lat: float, lng: float):
 
 @app.get("/")
 def raiz():
-    return {"mensaje": "GeoRiesgo Chile API", "endpoints": ["/geologia", "/fallas", "/sismos", "/consulta", "/riesgo"]}
+    return {"mensaje": "GeoRiesgo Chile API", "backend_datos": geo.BACKEND, "endpoints": ["/geologia", "/fallas", "/sismos", "/consulta", "/riesgo"]}
 
 
 @app.get("/geologia")
