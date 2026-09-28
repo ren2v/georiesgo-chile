@@ -62,7 +62,8 @@ def test_agente_recuerda_la_conversacion_y_reporta_solo_el_turno_actual(agente_c
     ag.preguntar("primera pregunta", "conv-2")
     segunda = ag.preguntar("¿y eso qué significa?", "conv-2")
 
-    assert segunda == {"respuesta": "Segunda respuesta, sin herramientas.", "herramientas": []}
+    assert segunda["respuesta"] == "Segunda respuesta, sin herramientas."
+    assert segunda["herramientas"] == []
     estado = ag.obtener_agente().get_state({"configurable": {"thread_id": "conv-2"}})
     assert [m.type for m in estado.values["messages"]] == ["human", "ai", "tool", "ai", "human", "ai"]
 
@@ -77,6 +78,41 @@ def test_agente_se_detiene_al_llegar_al_tope_de_llamadas(agente_con_modelo):
     estado = ag.obtener_agente().get_state({"configurable": {"thread_id": "conv-3"}})
     llamadas_al_modelo = [m for m in estado.values["messages"] if m.type == "ai" and m.tool_calls]
     assert len(llamadas_al_modelo) == agente.MAX_LLAMADAS_MODELO
+
+
+@pytest.mark.parametrize("mensaje, reintentar", [
+    ("503 UNAVAILABLE. This model is currently experiencing high demand.", True),
+    ("429 RESOURCE_EXHAUSTED. quotaId: GenerateRequestsPerMinutePerProjectPerModel-FreeTier", True),
+    # Cuota diaria: no vuelve en segundos, se pasa al modelo de respaldo.
+    ("429 RESOURCE_EXHAUSTED. quotaId: GenerateRequestsPerDayPerProjectPerModel-FreeTier", False),
+    ("400 INVALID_ARGUMENT. API key not valid.", False),
+    ("404 NOT_FOUND. This model is no longer available.", False),
+])
+def test_solo_se_reintentan_errores_transitorios(mensaje, reintentar):
+    assert agente.es_error_transitorio(RuntimeError(mensaje)) is reintentar
+
+
+def test_modelo_principal_caido_pasa_al_respaldo(monkeypatch):
+    class ModeloCaido(ModeloFalso):
+        def _generate(self, *args, **kwargs):
+            raise RuntimeError("503 UNAVAILABLE. This model is currently experiencing high demand.")
+
+    def fabrica(nombre, **kwargs):
+        if nombre == agente.MODELO:
+            return ModeloCaido(messages=iter([]))
+        return ModeloFalso(messages=iter([AIMessage(content=f"Respondió {nombre}.")]))
+
+    monkeypatch.setattr(agente, "init_chat_model", fabrica)
+    # Mismo middleware de reintentos, pero sin esperar entre intentos.
+    reintentos_reales = agente.ModelRetryMiddleware
+    monkeypatch.setattr(agente, "ModelRetryMiddleware",
+                        lambda **kw: reintentos_reales(**{**kw, "initial_delay": 0, "jitter": False}))
+    agente.obtener_agente.cache_clear()
+    try:
+        resultado = agente.preguntar("hola", "conv-respaldo")
+    finally:
+        agente.obtener_agente.cache_clear()
+    assert resultado["respuesta"] == f"Respondió {agente.MODELOS_RESPALDO[0]}."
 
 
 # --- Endpoint /agente ---

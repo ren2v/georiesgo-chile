@@ -13,7 +13,12 @@ from typing import AsyncIterator
 
 from dotenv import load_dotenv
 from langchain.agents import create_agent
-from langchain.agents.middleware import ModelCallLimitMiddleware, ToolCallLimitMiddleware
+from langchain.agents.middleware import (
+    ModelCallLimitMiddleware,
+    ModelFallbackMiddleware,
+    ModelRetryMiddleware,
+    ToolCallLimitMiddleware,
+)
 from langchain.chat_models import init_chat_model
 from langgraph.checkpoint.memory import InMemorySaver
 
@@ -21,7 +26,21 @@ from agente.herramientas import HERRAMIENTAS
 
 load_dotenv(Path(__file__).resolve().parents[2] / ".env")
 
-MODELO = os.getenv("GEORIESGO_MODELO", "google_genai:gemini-3.8-flash")
+MODELO = os.getenv("GEORIESGO_MODELO", "google_genai:gemini-3.6-flash")
+
+# Si el modelo principal falla tras los reintentos, se prueba con estos, en
+# orden (lista separada por comas). En el tier gratuito de Gemini la cuota
+# diaria es por modelo (p. ej. 20 peticiones/día en gemini-3.8-flash) y los
+# modelos nuevos suelen estar saturados, así que una cadena larga es lo que
+# hace usable el agente.
+MODELOS_RESPALDO_POR_DEFECTO = ",".join(f"google_genai:{m}" for m in [
+    "gemini-3.7-flash", "gemini-3.5-flash", "gemini-3.8-flash", "gemini-3.5-flash-lite", "gemini-3.1-flash-lite",
+])
+MODELOS_RESPALDO = [
+    m.strip()
+    for m in os.getenv("GEORIESGO_MODELOS_RESPALDO", MODELOS_RESPALDO_POR_DEFECTO).split(",")
+    if m.strip()
+]
 
 # Variable de entorno con la API key que exige cada proveedor.
 LLAVES_POR_PROVEEDOR = {
@@ -61,15 +80,41 @@ def llave_configurada() -> bool:
     return variable is None or bool(os.getenv(variable))
 
 
+def es_error_transitorio(error: Exception) -> bool:
+    """Errores que vale la pena reintentar con el mismo modelo: saturado
+    (503), error interno (500) o límite por minuto (429). No se reintentan
+    una key inválida (400/403) ni la cuota diaria agotada: esa no vuelve en
+    segundos, así que conviene pasar directo al modelo de respaldo. Se lee
+    el texto del error para no depender de las clases de cada proveedor."""
+    texto = str(error)
+    if "PerDay" in texto:
+        return False
+    return any(marca in texto for marca in ("503", "500", "429", "UNAVAILABLE", "RESOURCE_EXHAUSTED", "overloaded"))
+
+
+def _modelo(nombre: str):
+    # Sin reintentos internos del cliente (el de Gemini trae 6 por defecto y
+    # sin timeout): los reintentos los maneja ModelRetryMiddleware, una sola
+    # capa visible. Si no, se multiplican por cada modelo de respaldo.
+    return init_chat_model(nombre, temperature=0, max_retries=0, timeout=60)
+
+
 @lru_cache(maxsize=1)
 def obtener_agente():
     return create_agent(
-        init_chat_model(MODELO, temperature=0),
+        _modelo(MODELO),
         HERRAMIENTAS,
         system_prompt=PROMPT_SISTEMA,
         middleware=[
             ModelCallLimitMiddleware(run_limit=MAX_LLAMADAS_MODELO),
             ToolCallLimitMiddleware(run_limit=MAX_LLAMADAS_HERRAMIENTAS),
+            # El respaldo envuelve a los reintentos: cada modelo se reintenta
+            # antes de pasar al siguiente.
+            *([ModelFallbackMiddleware(*[_modelo(m) for m in MODELOS_RESPALDO])] if MODELOS_RESPALDO else []),
+            # on_failure="error": si se agotan los reintentos, que falle de
+            # verdad. El valor por defecto devuelve el error disfrazado de
+            # respuesta del modelo, y eso lo esconde del usuario y de las evals.
+            ModelRetryMiddleware(max_retries=2, retry_on=es_error_transitorio, on_failure="error", initial_delay=2.0),
         ],
         # Memoria de conversación por conversacion_id, en memoria del proceso:
         # se pierde al reiniciar. En producción: checkpointer de Postgres.
@@ -93,6 +138,8 @@ def preguntar(mensaje: str, conversacion_id: str) -> dict:
     resultados = {m.tool_call_id: m.content for m in turno if m.type == "tool"}
     return {
         "respuesta": turno[-1].text,
+        # Qué modelo respondió de verdad (puede ser uno de respaldo).
+        "modelo": turno[-1].response_metadata.get("model_name"),
         "herramientas": [
             {"nombre": llamada["name"], "args": llamada["args"], "resultado": _leer_json(resultados.get(llamada["id"]))}
             for m in turno if m.type == "ai"

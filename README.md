@@ -57,9 +57,20 @@ Crea un archivo `.env` en la raíz (está en `.gitignore`):
 
 ```bash
 GOOGLE_API_KEY=...                                  # key gratuita de aistudio.google.com
-# GEORIESGO_MODELO=google_genai:gemini-3.8-flash    # por defecto
+# GEORIESGO_MODELO=google_genai:gemini-3.6-flash    # por defecto
+# GEORIESGO_MODELOS_RESPALDO=google_genai:gemini-3.7-flash,...   # cadena de respaldo
 # GEORIESGO_MODELO=anthropic:claude-opus-5          # otro proveedor: requiere langchain-anthropic y ANTHROPIC_API_KEY
 ```
+
+En el tier gratuito de Gemini la cuota diaria es **por modelo** y baja
+(p. ej. 20 peticiones/día en `gemini-3.8-flash`), y los modelos recién
+lanzados suelen responder 503 por saturación. Por eso el agente:
+
+- reintenta solo errores transitorios (503, límite por minuto) con espera
+  exponencial, y pasa directo al siguiente modelo si se agotó la cuota diaria;
+- recorre una cadena de modelos de respaldo, cada uno con su propia cuota;
+- desactiva los reintentos internos del cliente de Gemini (6 por defecto y
+  sin timeout), que multiplicados por la cadena agotaban la cuota en segundos.
 
 ```bash
 python backend/agente/consola.py    # chat en la terminal

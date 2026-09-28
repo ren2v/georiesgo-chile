@@ -9,9 +9,14 @@ from agente.evaluar import nombrados, verificar
     ("Cerro Alegre tiene un riesgo sísmico relativo **Alto**.", {"Alto"}),
     ("El nivel de riesgo es Moderado (45 %).", {"Moderado"}),
     ("Nivel: **Bajo**", {"Bajo"}),
+    ("La zona tiene riesgo alto.", {"Alto"}),
+    # Respuesta real de Gemini que el patrón anterior no detectaba:
+    ("El nivel de riesgo sísmico relativo en la **Plaza de Armas de Santiago** es **Moderado** (puntaje del **56.8%**).",
+     {"Moderado"}),
     # Falsos positivos que el patrón debe ignorar:
     ("La placa de Nazca se hunde bajo la Sudamericana.", set()),
     ("Evacúa hacia terreno alto.", set()),
+    ("El riesgo de tsunami baja si evacúas a un terreno alto.", set()),
     ("", set()),
 ])
 def test_nombrados_detecta_solo_niveles_atribuidos(texto, esperado):

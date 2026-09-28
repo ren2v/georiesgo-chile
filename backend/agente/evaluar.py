@@ -43,15 +43,21 @@ def contiene(texto: str, frase: str) -> bool:
     return normalizar(frase) in normalizar(texto)
 
 
-# Un nivel cuenta solo si va tras "riesgo" o "nivel" (con hasta 3 palabras
-# entre medio: "riesgo sísmico relativo **Alto**"). Buscar la palabra suelta
-# daría falsos positivos: "bajo la placa Sudamericana", "terreno alto".
-PATRON_NIVEL = re.compile(r"\b(?:riesgo|nivel)\W+(?:\w+\W+){0,3}?(alto|moderado|bajo)\b", re.IGNORECASE)
+# Buscar la palabra suelta daría falsos positivos ("bajo la placa
+# Sudamericana", "evacúa a terreno alto"), así que un nivel cuenta solo si:
+# - va con mayúscula (como lo escribe el modelo al citar el resultado) en la
+#   misma oración que "riesgo"/"nivel": "El nivel de riesgo sísmico relativo
+#   en la Plaza de Armas de Santiago es **Moderado**";
+# - o en minúscula, pegado a "riesgo"/"nivel": "tiene riesgo alto".
+PATRONES_NIVEL = [
+    re.compile(r"\b(?i:riesgo|nivel)\b[^.\n]{0,80}?\b(Alto|Moderado|Bajo|ALTO|MODERADO|BAJO)\b"),
+    re.compile(r"\b(?:riesgo|nivel)\W+(?:\w+\W+){0,2}?(alto|moderado|bajo)\b", re.IGNORECASE),
+]
 
 
 def nombrados(texto: str) -> set[str]:
     """Niveles de riesgo que la respuesta atribuye al lugar."""
-    return {m.group(1).capitalize() for m in PATRON_NIVEL.finditer(texto)}
+    return {m.group(1).capitalize() for patron in PATRONES_NIVEL for m in patron.finditer(texto)}
 
 
 def verificar(caso: dict, resultado: dict) -> list[dict]:
@@ -104,6 +110,8 @@ def correr_caso(caso: dict) -> dict:
     checks = verificar(caso, resultado)
     return {
         "id": caso["id"],
+        # Con la cadena de respaldo, cada caso puede responderlo un modelo distinto.
+        "modelo_respuesta": resultado["modelo"],
         "segundos": round(time.perf_counter() - inicio, 1),
         "respuesta": resultado["respuesta"],
         "herramientas": [{"nombre": h["nombre"], "args": h["args"]} for h in resultado["herramientas"]],
@@ -117,40 +125,57 @@ def main():
         sys.exit(f"Falta la API key para {agente.MODELO} en el archivo .env")
 
     casos = yaml.safe_load(CASOS.read_text(encoding="utf-8"))
-    if filtro := set(sys.argv[1:]):
+    argumentos = sys.argv[1:]
+    anteriores = {}
+    salida = None
+    if "--reintentar" in argumentos:
+        # Solo los casos que en la última corrida dieron error de servicio
+        # (modelo caído, cuota): los ya evaluados no se repiten ni gastan cuota.
+        salida = max(RESULTADOS.glob("*.json"), key=lambda p: p.stat().st_mtime)
+        anteriores = {r["id"]: r for r in json.loads(salida.read_text(encoding="utf-8"))["resultados"]}
+        pendientes = {i for i, r in anteriores.items() if "error" in r}
+        casos = [c for c in casos if c["id"] in pendientes]
+        print(f"Reintentando {len(casos)} caso(s) con error de {salida.name}")
+    elif filtro := set(argumentos):
         casos = [c for c in casos if c["id"] in filtro]
 
-    print(f"Modelo: {agente.MODELO} · {len(casos)} casos\n")
-    resultados = []
+    print(f"Modelo: {agente.MODELO} (respaldo: {', '.join(agente.MODELOS_RESPALDO) or 'ninguno'}) · {len(casos)} casos\n")
     for i, caso in enumerate(casos):
         if i:
             time.sleep(PAUSA_ENTRE_CASOS_S)
         r = correr_caso(caso)
-        resultados.append(r)
-        marca = "OK  " if r["ok"] else "FALLA"
-        print(f"{marca} {r['id']}")
+        anteriores[r["id"]] = r
+        if "error" in r:
+            print(f"ERROR {r['id']}\n       ✗ {r['error'][:200]}")
+            continue
+        print(f"{'OK  ' if r['ok'] else 'FALLA'} {r['id']}  [{r['modelo_respuesta']}]")
         for c in r["checks"]:
             if not c["ok"]:
                 print(f"       ✗ {c['check']} {c['detalle']}")
-        if "error" in r:
-            print(f"       ✗ {r['error'][:200]}")
 
-    total_checks = sum(len(r["checks"]) for r in resultados)
-    checks_ok = sum(c["ok"] for r in resultados for c in r["checks"])
-    casos_ok = sum(r["ok"] for r in resultados)
-    print(f"\nCasos: {casos_ok}/{len(resultados)} · Checks: {checks_ok}/{total_checks}")
+    resultados = list(anteriores.values())
+    # Los casos con error de servicio no se evaluaron: no cuentan como falla
+    # del agente, se informan aparte para no mezclar calidad con disponibilidad.
+    evaluados = [r for r in resultados if "error" not in r]
+    resumen = {
+        "casos_ok": sum(r["ok"] for r in evaluados),
+        "casos_evaluados": len(evaluados),
+        "casos_con_error_de_servicio": len(resultados) - len(evaluados),
+        "checks_ok": sum(c["ok"] for r in evaluados for c in r["checks"]),
+        "checks_total": sum(len(r["checks"]) for r in evaluados),
+    }
+    print(f"\nCasos: {resumen['casos_ok']}/{resumen['casos_evaluados']} · "
+          f"Checks: {resumen['checks_ok']}/{resumen['checks_total']} · "
+          f"Sin evaluar por error de servicio: {resumen['casos_con_error_de_servicio']}")
 
     RESULTADOS.mkdir(parents=True, exist_ok=True)
-    marca_tiempo = datetime.now().strftime("%Y-%m-%d_%H%M")
-    modelo = agente.MODELO.replace(":", "_").replace("/", "_")
-    salida = RESULTADOS / f"{marca_tiempo}_{modelo}.json"
+    if salida is None:
+        modelo = agente.MODELO.replace(":", "_").replace("/", "_")
+        salida = RESULTADOS / f"{datetime.now():%Y-%m-%d_%H%M}_{modelo}.json"
     salida.write_text(json.dumps({
         "modelo": agente.MODELO,
-        "fecha": marca_tiempo,
-        "casos_ok": casos_ok,
-        "casos_total": len(resultados),
-        "checks_ok": checks_ok,
-        "checks_total": total_checks,
+        "modelos_respaldo": agente.MODELOS_RESPALDO,
+        **resumen,
         "resultados": resultados,
     }, ensure_ascii=False, indent=2), encoding="utf-8")
     print(f"Detalle en {salida.relative_to(RAIZ)}")
