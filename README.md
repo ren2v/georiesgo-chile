@@ -57,14 +57,16 @@ Crea un archivo `.env` en la raíz (está en `.gitignore`):
 
 ```bash
 GOOGLE_API_KEY=...                                  # key gratuita de aistudio.google.com
-# GEORIESGO_MODELO=google_genai:gemini-3.6-flash    # por defecto
+# GEORIESGO_MODELO=google_genai:gemini-3.5-flash-lite   # por defecto
 # GEORIESGO_MODELOS_RESPALDO=google_genai:gemini-3.7-flash,...   # cadena de respaldo
 # GEORIESGO_MODELO=anthropic:claude-opus-5          # otro proveedor: requiere langchain-anthropic y ANTHROPIC_API_KEY
 ```
 
-En el tier gratuito de Gemini la cuota diaria es **por modelo** y baja
-(p. ej. 20 peticiones/día en `gemini-3.8-flash`), y los modelos recién
-lanzados suelen responder 503 por saturación. Por eso el agente:
+En el tier gratuito de Gemini la cuota diaria es **por modelo**: 500
+peticiones/día en los Flash Lite, pero solo 20 en los Flash (3.5 a 3.8), que
+no alcanzan ni para una corrida de evals. Los modelos recién lanzados además
+suelen responder 503 por saturación, y esos errores también descuentan
+cuota. Por eso el principal es `gemini-3.5-flash-lite` y el agente:
 
 - reintenta solo errores transitorios (503, límite por minuto) con espera
   exponencial, y pasa directo al siguiente modelo si se agotó la cuota diaria;

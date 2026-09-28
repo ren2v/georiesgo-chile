@@ -49,7 +49,7 @@
 - id: sismos_cercanos_iquique
   turnos: ["¿Qué sismos grandes ha habido cerca de Iquique?"]
   herramientas_esperadas: [geocodificar_direccion]
-  debe_mencionar: [[2014, M8, 8.2, 8,2, sism]]
+  debe_mencionar: [["2014", "M8", "8.2", "8,2", "sism"]]
 
 - id: fallas_las_condes
   turnos: ["¿Hay fallas geológicas activas cerca de Las Condes?"]

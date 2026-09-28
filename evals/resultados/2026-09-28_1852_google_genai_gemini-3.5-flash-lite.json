@@ -1,0 +1,581 @@
+{
+  "modelo": "google_genai:gemini-3.5-flash-lite",
+  "modelos_respaldo": [
+    "google_genai:gemini-3.1-flash-lite",
+    "google_genai:gemini-3.6-flash",
+    "google_genai:gemini-3.7-flash",
+    "google_genai:gemini-3.5-flash",
+    "google_genai:gemini-3.8-flash"
+  ],
+  "casos_ok": 16,
+  "casos_evaluados": 16,
+  "casos_con_error_de_servicio": 0,
+  "checks_ok": 40,
+  "checks_total": 40,
+  "resultados": [
+    {
+      "id": "riesgo_direccion_valparaiso",
+      "modelo_respuesta": "gemini-3.5-flash-lite",
+      "segundos": 19.1,
+      "respuesta": "El riesgo sísmico estimado para **Cerro Alegre, Valparaíso**, es **Alto** (con un puntaje relativo de **37,6%** en nuestro modelo). \n\n*(Recuerda que este puntaje es una comparación relativa entre puntos de Chile y no una probabilidad de que ocurra un terremoto; todo el territorio chileno es altamente sísmico).*\n\n### Detalle de los factores principales:\n* **Exposición por subducción:** El sector se encuentra a solo 2,6 km de la costa, enfrentando la zona de convergencia de placas (zona de subducción chilena), la cual concentra la mayor amenaza de grandes terremotos de interfaz (como el histórico de M8.3 en la zona y el terremoto de Valparaíso de 1985).\n* **Sismicidad cortical:** Se registra actividad frecuente de sismos superficiales (menores a 30 km de profundidad) en los alrededores, lo que indica movimiento en estructuras locales.\n* **Tipo de suelo:** El punto evaluado se ubica sobre **roca consolidada** (plutónica/metamórfica, correspondiente a monzodioritas y granodioritas del Jurásico), lo que estructuralmente le otorga mayor estabilidad geológica en comparación con suelos de relleno o sedimentarios. \n* **Tsunami:** Al estar cerca de la costa (a 2,6 km), el sector está expuesto a la amenaza de tsunami ante un sismo de gran magnitud. *Nota: Para decisiones específicas de evacuación o zonificación costera, revisa las cartas oficiales CITSU del SHOA en [shoa.cl](https://www.shoa.cl).*\n\nNadie puede predecir cuándo ocurrirá un próximo terremoto. Para proyectos de construcción, compra de propiedades o evaluaciones detalladas de suelo, se recomienda siempre consultar con un ingeniero civil o geólogo especialista. Ante cualquier sismo fuerte que te impida mantenerte en pie, sigue las instrucciones de SENAPRED y evacúa hacia zonas de seguridad si te encuentras en la costa.",
+      "herramientas": [
+        {
+          "nombre": "geocodificar_direccion",
+          "args": {
+            "direccion": "Cerro Alegre, Valparaíso, Chile"
+          }
+        },
+        {
+          "nombre": "evaluar_riesgo_sismico",
+          "args": {
+            "lng": -71.62984,
+            "lat": -33.04341
+          }
+        },
+        {
+          "nombre": "buscar_sismos_cercanos",
+          "args": {
+            "min_magnitud": 4,
+            "radio_km": 50,
+            "lat": -33.04341,
+            "lng": -71.62984
+          }
+        },
+        {
+          "nombre": "buscar_fallas_cercanas",
+          "args": {
+            "lng": -71.62984,
+            "lat": -33.04341,
+            "radio_km": 50
+          }
+        }
+      ],
+      "checks": [
+        {
+          "check": "herramientas_esperadas",
+          "ok": true,
+          "detalle": "usó ['geocodificar_direccion', 'evaluar_riesgo_sismico', 'buscar_sismos_cercanos', 'buscar_fallas_cercanas']"
+        },
+        {
+          "check": "menciona:relativ|comparación|compara",
+          "ok": true,
+          "detalle": ""
+        },
+        {
+          "check": "nivel_consistente",
+          "ok": true,
+          "detalle": "herramienta: ['Alto'] · respuesta: ['Alto']"
+        }
+      ],
+      "ok": true
+    },
+    {
+      "id": "riesgo_direccion_santiago",
+      "modelo_respuesta": "gemini-3.5-flash-lite",
+      "segundos": 24.0,
+      "respuesta": "El riesgo sísmico relativo estimado para la **Plaza de Armas de Santiago** es **Moderado**, con un puntaje de **56,8 %**.\n\nEste puntaje es una comparación relativa entre puntos del país, no una probabilidad de terremoto; todo Chile es sísmicamente activo.\n\n### Factores principales:\n* **Suelo:** Se ubica sobre depósitos sedimentarios o aluviales (Depresión Central), los cuales presentan un mayor riesgo de amplificación de ondas sísmicas.\n* **Falla activa cercana:** La falla **San Ramón** (segmento 01a) se encuentra a unos **10,9 km** de distancia. Cabe destacar que esta falla presenta un \"silencio sísmico\" instrumental (sin sismos superficiales recientes registrados), pero su peligrosidad ha sido comprobada mediante estudios paleosismológicos en trincheras.\n* **Subducción:** Se encuentra a **91,2 km** de la costa, expuesta a la sismicidad de la placa de Nazca y a eventos históricos de interfaz.\n* **Sismicidad histórica y cercana:** En un radio de 50 km se han registrado sismos instrumentales frecuentes (como el sismo M5.6 de 2023), y se ve influenciada por grandes terremotos históricos de la zona central como el de Valparaíso de 1985 (a 113 km).\n\n*Nota: Este modelo entrega una estimación relativa basada en datos públicos (CSN, SERNAGEOMIN, GEM) y no reemplaza un estudio de mecánica de suelos ni la opinión de un ingeniero o geólogo. Para decisiones de construcción, asegúrese de cumplir estrictamente con la norma sísmica chilena NCh433.*\n\n*(Fuente: [Metodología del modelo de riesgo de GeoRiesgo Chile](https://github.com/ren2v/georiesgo-chile))*",
+      "herramientas": [
+        {
+          "nombre": "geocodificar_direccion",
+          "args": {
+            "direccion": "Plaza de Armas, Santiago, Chile"
+          }
+        },
+        {
+          "nombre": "evaluar_riesgo_sismico",
+          "args": {
+            "lat": -33.43742,
+            "lng": -70.65128
+          }
+        },
+        {
+          "nombre": "buscar_sismos_cercanos",
+          "args": {
+            "lng": -70.65128,
+            "radio_km": 50,
+            "min_magnitud": 4,
+            "lat": -33.43742
+          }
+        },
+        {
+          "nombre": "buscar_fallas_cercanas",
+          "args": {
+            "radio_km": 50,
+            "lng": -70.65128,
+            "lat": -33.43742
+          }
+        },
+        {
+          "nombre": "buscar_en_documentos",
+          "args": {
+            "pregunta": "qué significa un riesgo moderado y cómo se calcula el puntaje"
+          }
+        }
+      ],
+      "checks": [
+        {
+          "check": "herramientas_esperadas",
+          "ok": true,
+          "detalle": "usó ['geocodificar_direccion', 'evaluar_riesgo_sismico', 'buscar_sismos_cercanos', 'buscar_fallas_cercanas', 'buscar_en_documentos']"
+        },
+        {
+          "check": "nivel_consistente",
+          "ok": true,
+          "detalle": "herramienta: ['Moderado'] · respuesta: ['Moderado']"
+        }
+      ],
+      "ok": true
+    },
+    {
+      "id": "riesgo_coordenadas_sin_geocodificar",
+      "modelo_respuesta": "gemini-3.5-flash-lite",
+      "segundos": 3.6,
+      "respuesta": "El punto `-33.45, -70.54` tiene un **riesgo sísmico Alto** con un puntaje de **67.1%**.\n\nEste puntaje es una comparación relativa entre puntos de Chile y **no representa una probabilidad de terremoto**, ya que todo el país es altamente sísmico.\n\n### Detalle de los factores:\n* **Falla geológica:** Se encuentra a solo **1.9 km de la Falla San Ramón (San Ramon 01a)**, lo que aporta fuertemente al riesgo del sector.\n* **Suelo:** Corresponde a depósitos sedimentarios/aluviales (Pleistoceno-Holoceno), los cuales presentan mayor riesgo de amplificación de ondas sísmicas.\n* **Subducción:** Está a 101.3 km de la costa, con influencia del contexto de la zona sismogénica de subducción (sismo histórico relevante como el de Valparaíso de 1985 a unos 124 km).\n* **Sismicidad cortical:** Aunque la falla está muy cerca, no registra sismicidad instrumental reciente, lo que es característico del \"silencio sísmico\" documentado en fallas activas como San Ramón (su peligrosidad se conoce por estudios paleosismológicos).\n\n*Nota: Esta herramienta entrega una estimación basada en datos públicos (SERNAGEOMIN, CSN, GEM) y no reemplaza un estudio de mecánica de suelos ni la asesoría de un ingeniero o geólogo para decisiones de construcción o compra.*",
+      "herramientas": [
+        {
+          "nombre": "evaluar_riesgo_sismico",
+          "args": {
+            "lng": -70.54,
+            "lat": -33.45
+          }
+        }
+      ],
+      "checks": [
+        {
+          "check": "herramientas_esperadas",
+          "ok": true,
+          "detalle": "usó ['evaluar_riesgo_sismico']"
+        },
+        {
+          "check": "no_usa:geocodificar_direccion",
+          "ok": true,
+          "detalle": "usó ['evaluar_riesgo_sismico']"
+        },
+        {
+          "check": "menciona:San Ramón",
+          "ok": true,
+          "detalle": ""
+        },
+        {
+          "check": "nivel_consistente",
+          "ok": true,
+          "detalle": "herramienta: ['Alto'] · respuesta: ['Alto']"
+        }
+      ],
+      "ok": true
+    },
+    {
+      "id": "riesgo_interior_atacama",
+      "modelo_respuesta": "gemini-3.1-flash-lite",
+      "segundos": 137.3,
+      "respuesta": "Vivir en San Pedro de Atacama presenta un **nivel de riesgo sísmico bajo** (7% en nuestra escala relativa).\n\nEs importante recordar que todo Chile es un país sísmico y que este puntaje es una comparación relativa entre distintos puntos del territorio, no una probabilidad de que ocurra un terremoto.\n\nAquí te detallo los puntos clave:\n\n*   **Sismicidad:** Aunque el riesgo es bajo, la zona registra actividad sísmica. Los sismos en esta área suelen ser de profundidad intermedia (asociados a la placa de Nazca subductando bajo la Sudamericana), lo que a menudo los hace sentirse de forma distinta a los sismos costeros. En el catálogo del Centro Sismológico Nacional (CSN) desde 2012, se han registrado 39 sismos de magnitud 4.0 o superior en un radio de 100 km, incluyendo eventos de magnitud relevante como el de 7.4 en julio de 2024.\n*   **Geología:** El suelo en la zona de San Pedro de Atacama está compuesto principalmente por roca consolidada (granitos y granodioritas), lo cual es un factor positivo, ya que este tipo de suelo suele ser más estable ante las ondas sísmicas en comparación con suelos blandos o sedimentarios.\n*   **Fallas:** No se han detectado fallas geológicas activas catalogadas en un radio de 50 km a la redonda de la localidad.\n\n**Recomendaciones:**\n*   **Construcción:** Si estás pensando en comprar o construir, te recomiendo siempre consultar con un ingeniero civil o geólogo para realizar un estudio de mecánica de suelos específico para el terreno, ya que las condiciones locales pueden variar.\n*   **Preparación:** Independiente del nivel de riesgo, siempre es fundamental estar preparado. Puedes revisar las recomendaciones oficiales de **SENAPRED** sobre qué hacer antes, durante y después de un sismo en su sitio web: [https://senapred.cl/](https://senapred.cl/).\n\n¿Te gustaría saber algo más sobre la geología de la zona o cómo prepararte ante una emergencia?",
+      "herramientas": [
+        {
+          "nombre": "geocodificar_direccion",
+          "args": {
+            "direccion": "San Pedro de Atacama, Antofagasta, Chile"
+          }
+        },
+        {
+          "nombre": "evaluar_riesgo_sismico",
+          "args": {
+            "lng": -67.90266,
+            "lat": -23.35455
+          }
+        },
+        {
+          "nombre": "buscar_fallas_cercanas",
+          "args": {
+            "radio_km": 100,
+            "lat": -23.35455,
+            "lng": -67.90266
+          }
+        },
+        {
+          "nombre": "buscar_sismos_cercanos",
+          "args": {
+            "radio_km": 100,
+            "lng": -67.90266,
+            "lat": -23.35455,
+            "min_magnitud": 4
+          }
+        }
+      ],
+      "checks": [
+        {
+          "check": "herramientas_esperadas",
+          "ok": true,
+          "detalle": "usó ['geocodificar_direccion', 'evaluar_riesgo_sismico', 'buscar_fallas_cercanas', 'buscar_sismos_cercanos']"
+        },
+        {
+          "check": "nivel_consistente",
+          "ok": true,
+          "detalle": "herramienta: ['Bajo'] · respuesta: ['Bajo']"
+        }
+      ],
+      "ok": true
+    },
+    {
+      "id": "punto_fuera_de_chile",
+      "modelo_respuesta": "gemini-3.1-flash-lite",
+      "segundos": 83.5,
+      "respuesta": "Lo siento, pero mi herramienta está diseñada exclusivamente para analizar el riesgo sísmico y geológico dentro del territorio de **Chile**. No cuento con datos ni herramientas para evaluar la situación sísmica en Argentina u otros países.\n\nSi tienes alguna consulta sobre un lugar en Chile, estaré encantado de ayudarte.",
+      "herramientas": [],
+      "checks": [
+        {
+          "check": "menciona:fuera de Chile|fuera del territorio|solo Chile|sólo Chile|no está en Chile|Argentina",
+          "ok": true,
+          "detalle": ""
+        },
+        {
+          "check": "no_menciona:Riesgo Alto",
+          "ok": true,
+          "detalle": ""
+        },
+        {
+          "check": "no_menciona:Riesgo Moderado",
+          "ok": true,
+          "detalle": ""
+        },
+        {
+          "check": "no_menciona:Riesgo Bajo",
+          "ok": true,
+          "detalle": ""
+        }
+      ],
+      "ok": true
+    },
+    {
+      "id": "construir_recomienda_profesional",
+      "modelo_respuesta": "gemini-3.5-flash-lite",
+      "segundos": 15.5,
+      "respuesta": "El nivel de riesgo sísmico estimado para Reñaca, Viña del Mar, es **Alto** (con un puntaje relativo de **45.4%**). \n\n*Nota importante:* Este puntaje es una comparación relativa entre puntos de Chile y no una probabilidad de terremoto; recuerda que **todo Chile es sísmico** y nadie puede predecir cuándo ocurrirá un próximo sismo.\n\n### Factores clave en este sector:\n* **Proximidad a la costa:** Al estar a solo 1.1 km de la costa, el punto presenta una exposición directa a la zona de subducción (interfaz de placas).\n* **Amenaza de tsunami:** Según las Cartas de Inundación por Tsunami (CITSU) del SHOA, este punto se encuentra dentro del área de inundación estimada para el peor escenario modelado. Es fundamental revisar las vías de evacuación antes de cualquier decisión.\n* **Suelo:** Cuenta con un entorno sedimentario marino y transicional (areniscas, limolitas y conglomerados). \n* **Sismicidad histórica:** La zona ha sentido eventos importantes en el pasado, como el terremoto de Valparaíso de 1985 (M8.0) y sismos recientes de magnitud moderada a alta en sus cercanías.\n\n### Recomendaciones:\n* **Estudio de mecánica de suelos:** Para cualquier proyecto de construcción, es indispensable contratar un ingeniero o geólogo y encargar un estudio de suelo específico para el terreno exacto que deseas comprar (esta herramienta no reemplaza un análisis en terreno).\n* **Normativa:** Asegúrate de que cualquier diseño cumpla estrictamente con la norma sísmica chilena (**NCh433**).",
+      "herramientas": [
+        {
+          "nombre": "geocodificar_direccion",
+          "args": {
+            "direccion": "Reñaca, Viña del Mar, Chile"
+          }
+        },
+        {
+          "nombre": "evaluar_riesgo_sismico",
+          "args": {
+            "lng": -71.54371,
+            "lat": -32.97153
+          }
+        },
+        {
+          "nombre": "buscar_fallas_cercanas",
+          "args": {
+            "radio_km": 50,
+            "lng": -71.54371,
+            "lat": -32.97153
+          }
+        },
+        {
+          "nombre": "buscar_sismos_cercanos",
+          "args": {
+            "lat": -32.97153,
+            "lng": -71.54371,
+            "min_magnitud": 5,
+            "radio_km": 50
+          }
+        }
+      ],
+      "checks": [
+        {
+          "check": "herramientas_esperadas",
+          "ok": true,
+          "detalle": "usó ['geocodificar_direccion', 'evaluar_riesgo_sismico', 'buscar_fallas_cercanas', 'buscar_sismos_cercanos']"
+        },
+        {
+          "check": "menciona:ingenier|geólog|mecánica de suelos",
+          "ok": true,
+          "detalle": ""
+        },
+        {
+          "check": "nivel_consistente",
+          "ok": true,
+          "detalle": "herramienta: ['Alto'] · respuesta: ['Alto']"
+        }
+      ],
+      "ok": true
+    },
+    {
+      "id": "sismos_cercanos_iquique",
+      "modelo_respuesta": "gemini-3.5-flash-lite",
+      "segundos": 4.4,
+      "respuesta": "Cerca de Iquique (en un radio de 150 km, considerando sismos de magnitud 6.0 o más registrados por el CSN desde 2012), destacan varios eventos importantes, encabezados por el **terremoto de magnitud 8.2 del 1 de abril de 2014** y su secuencia de réplicas.\n\nLos sismos de mayor magnitud registrados en la zona son:\n* **01-04-2014 — Magnitud 8.2** (Terremoto de Iquique, profundidad 39 km, a unos 89 km de la ciudad)\n* **03-04-2014 — Magnitud 6.3** (Réplica importante)\n* **01-11-2018 — Magnitud 6.3** (a ~100 km)\n* **06-12-2020 — Magnitud 6.1** (a ~114 km)\n\n*Nota: El catálogo instrumental del Centro Sismológico Nacional (CSN) utilizado abarca desde el año 2012, por lo que no incluye terremotos históricos anteriores a esa fecha (como el gran terremoto de 1877).*",
+      "herramientas": [
+        {
+          "nombre": "geocodificar_direccion",
+          "args": {
+            "direccion": "Iquique, Tarapacá, Chile"
+          }
+        },
+        {
+          "nombre": "buscar_sismos_cercanos",
+          "args": {
+            "radio_km": 150,
+            "lng": -70.15246,
+            "lat": -20.21407,
+            "min_magnitud": 6
+          }
+        }
+      ],
+      "checks": [
+        {
+          "check": "herramientas_esperadas",
+          "ok": true,
+          "detalle": "usó ['geocodificar_direccion', 'buscar_sismos_cercanos']"
+        },
+        {
+          "check": "menciona:2014|M8|8.2|8,2|sism",
+          "ok": true,
+          "detalle": ""
+        }
+      ],
+      "ok": true
+    },
+    {
+      "id": "fallas_las_condes",
+      "modelo_respuesta": "gemini-3.5-flash-lite",
+      "segundos": 23.6,
+      "respuesta": "Sí, hay fallas geológicas activas muy cerca de Las Condes. \n\nLa herramienta de fallas (basada en la base de datos GEM) identifica lo siguiente a 30 km a la redonda del centro de la comuna:\n\n* **Falla San Ramón (tramo San Ramon 01a):** Se encuentra a solo **2,5 km** de distancia y es de tipo inversa (*Reverse*).\n\nEste trazo es parte del sistema de falla San Ramón, una estructura tectónica activa relevante al oriente de la Región Metropolitana. \n\n*Nota: Para proyectos de construcción, compra de propiedades o análisis detallados de suelo y cercanía a fallas, es indispensable contar con la asesoría de un ingeniero, geólogo o un estudio de mecánica de suelos.*",
+      "herramientas": [
+        {
+          "nombre": "geocodificar_direccion",
+          "args": {
+            "direccion": "Las Condes, Santiago, Chile"
+          }
+        },
+        {
+          "nombre": "buscar_fallas_cercanas",
+          "args": {
+            "radio_km": 30,
+            "lat": -33.40845,
+            "lng": -70.56715
+          }
+        }
+      ],
+      "checks": [
+        {
+          "check": "herramientas_esperadas",
+          "ok": true,
+          "detalle": "usó ['geocodificar_direccion', 'buscar_fallas_cercanas']"
+        },
+        {
+          "check": "menciona:San Ramón",
+          "ok": true,
+          "detalle": ""
+        }
+      ],
+      "ok": true
+    },
+    {
+      "id": "que_hacer_playa",
+      "modelo_respuesta": "gemini-3.5-flash-lite",
+      "segundos": 19.4,
+      "respuesta": "Si estás en la playa o en la costa y **el sismo hace difícil mantenerse en pie**, debes **evacuar de inmediato hacia un punto de encuentro o zona segura en altura**, sin esperar una alerta oficial ni a que termine el temblor (Fuente: [SENAPRED](https://senapred.cl/sismos/)).\n\nToma en cuenta las siguientes recomendaciones:\n\n* **No esperes avisos**: Un sismo fuerte es tu señal natural de alerta de tsunami.\n* **Alejate de ríos y esteros**: El agua del tsunami puede ingresar varios kilómetros por los cauces. No los cruces.\n* **Prioriza la evacuación a pie**: Camina hacia terrenos altos o zonas de seguridad señalizadas. Si andas en vehículo, podrías quedar atrapado en tacos.\n* **Evacuación vertical**: Solo si no hay tiempo para llegar a zonas altas, busca refugio en los pisos superiores (8° piso o más) de un edificio resistente.\n* **Si el mar se retira**: Si notas que el mar se retira inusualmente y deja el fondo marino al descubierto, evacúa de inmediato aunque no hayas sentido un sismo fuerte (Fuente: [SENAPRED](https://senapred.cl/tsunami/)).",
+      "herramientas": [
+        {
+          "nombre": "buscar_en_documentos",
+          "args": {
+            "pregunta": "qué hacer en caso de sismo fuerte en la costa tsunami senapred"
+          }
+        }
+      ],
+      "checks": [
+        {
+          "check": "herramientas_esperadas",
+          "ok": true,
+          "detalle": "usó ['buscar_en_documentos']"
+        },
+        {
+          "check": "menciona:evacu",
+          "ok": true,
+          "detalle": ""
+        },
+        {
+          "check": "menciona:altura|alto|elevad|zona segura|zona de seguridad|punto de encuentro",
+          "ok": true,
+          "detalle": ""
+        }
+      ],
+      "ok": true
+    },
+    {
+      "id": "emergencia_en_curso",
+      "modelo_respuesta": "gemini-3.5-flash-lite",
+      "segundos": 2.5,
+      "respuesta": "¡Mantén la calma y actúa de inmediato! Si estás frente al mar en Iquique y el temblor es tan fuerte que **te cuesta mantenerte en pie**, sigue estas instrucciones oficiales de SENAPRED:\n\n1. **Evacúa hacia zonas seguras en altura** (sectores de seguridad establecidos para tsunami) de inmediato, sin esperar a que den la alarma. No uses vehículos si congestionan las vías; hazlo a pie.\n2. **Aléjate de la playa y de la zona costera**, ya que un sismo de gran intensidad puede generar un tsunami.\n3. Mantente informado a través de una radio a pilas o fuentes oficiales cuando estés a resguardo.\n4. No vuelvas a la costa hasta que las autoridades de SENAPRED y la autoridad marítima lo indiquen oficialmente.\n\n*(Recuerda que no reemplazamos las indicaciones de emergencia en curso: sigue estrictamente las instrucciones locales y de los organismos de protección civil).*",
+      "herramientas": [],
+      "checks": [
+        {
+          "check": "menciona:evacu",
+          "ok": true,
+          "detalle": ""
+        }
+      ],
+      "ok": true
+    },
+    {
+      "id": "que_es_citsu",
+      "modelo_respuesta": "gemini-3.5-flash-lite",
+      "segundos": 8.1,
+      "respuesta": "Una **carta CITSU** es un mapa oficial del **SHOA** (Servicio Hidrográfico y Oceanográfico de la Armada) que muestra el área máxima que se inundaría en una localidad de la costa chilena ante un tsunami extremo.\n\nLos puntos clave sobre las CITSU son:\n- **Peor escenario:** Representan un evento extremo (el mayor tsunami histórico o el máximo probable para la zona), no una inundación rutinaria.\n- **Para qué sirven:** Se usan en planificación territorial, ordenamiento del borde costero y para definir rutas y zonas seguras de evacuación.\n- **Alcance:** Cubren las principales zonas urbanas y portuarias del litoral de Chile.\n\n*Fuente:* [Cartas de Inundación por Tsunami (CITSU) del SHOA](https://www.directemar.cl/directemar/noticias-y-comunicaciones/noticias/2020/shoa-publica-cartas-de-inundacion-por-tsunami-citsu).",
+      "herramientas": [
+        {
+          "nombre": "buscar_en_documentos",
+          "args": {
+            "pregunta": "qué es una carta CITSU"
+          }
+        }
+      ],
+      "checks": [
+        {
+          "check": "herramientas_esperadas",
+          "ok": true,
+          "detalle": "usó ['buscar_en_documentos']"
+        },
+        {
+          "check": "menciona:SHOA",
+          "ok": true,
+          "detalle": ""
+        },
+        {
+          "check": "menciona:inundaci",
+          "ok": true,
+          "detalle": ""
+        }
+      ],
+      "ok": true
+    },
+    {
+      "id": "como_se_calcula",
+      "modelo_respuesta": "gemini-3.5-flash-lite",
+      "segundos": 8.6,
+      "respuesta": "El puntaje de riesgo (de 0 a 100 %) y su nivel (Bajo, Moderado o Alto) son una **comparación relativa entre puntos de Chile**, no una probabilidad de terremoto: recuerda que todo Chile es sísmico. \n\nEl cálculo combina cuatro factores con distintos pesos (máximo 13 puntos en total):\n\n1. **Falla (peso 5):** Cercanía a fallas geológicas activas catalogadas (el aporte decae linealmente desde 0 a 30 km de distancia).\n2. **Exposición a subducción (peso 4):** Cercanía a la costa y a la zona de contacto de placas (fosa) donde ocurren los grandes terremotos.\n3. **Sismicidad cortical (peso 2):** Cantidad y magnitud de sismos superficiales (menos de 30 km de profundidad) registrados cerca del punto desde 2012.\n4. **Suelo (peso 2):** Tipo de depósito geológico inferido bajo el punto.\n\n**Reglas adicionales:**\n- **Niveles:** Se califica como **Bajo** (bajo 30 %), **Moderado** (30 % a 59 %) o **Alto** (60 % o más).\n- **Amenaza extrema:** Si un factor individual (como una falla muy cercana) es extremo (0,85 o más), el nivel pasa directo a **Alto** aunque el puntaje total no alcance el 60 %.\n- **Información adicional:** Factores como la inundación por tsunami (según cartas CITSU del SHOA) se informan de manera independiente y no modifican este puntaje matemático.\n\n*Fuente:* [Metodología del modelo de riesgo de GeoRiesgo Chile](https://github.com/ren2v/georiesgo-chile).\n\nTen en cuenta que este puntaje utiliza datos públicos referenciales y no reemplaza un estudio de mecánica de suelos ni la opinión de un ingeniero o geólogo para decisiones de construcción o compra.",
+      "herramientas": [
+        {
+          "nombre": "buscar_en_documentos",
+          "args": {
+            "pregunta": "cómo se calcula el puntaje de riesgo metodología del modelo"
+          }
+        }
+      ],
+      "checks": [
+        {
+          "check": "herramientas_esperadas",
+          "ok": true,
+          "detalle": "usó ['buscar_en_documentos']"
+        },
+        {
+          "check": "menciona:falla",
+          "ok": true,
+          "detalle": ""
+        },
+        {
+          "check": "menciona:suelo",
+          "ok": true,
+          "detalle": ""
+        },
+        {
+          "check": "menciona:subducci|costa",
+          "ok": true,
+          "detalle": ""
+        }
+      ],
+      "ok": true
+    },
+    {
+      "id": "prediccion_terremotos",
+      "modelo_respuesta": "gemini-3.5-flash-lite",
+      "segundos": 2.0,
+      "respuesta": "Nadie puede predecir cuándo ocurrirá un próximo terremoto ni en Santiago ni en ninguna otra parte del mundo. Los sismos no se pueden pronosticar con fecha u hora. \n\nSí es posible saber que **Chile es un país altamente sísmico** por su ubicación frente a la zona de subducción (la placa de Nazca bajo la placa Sudamericana), por lo que siempre debemos estar preparados.\n\nSi quieres, puedo analizar el **riesgo sísmico relativo**, los sismos históricos o las fallas geológicas cercanas a alguna dirección o comuna específica de Santiago usando mis herramientas de datos públicos. ¿Te gustaría revisar un punto en particular?",
+      "herramientas": [],
+      "checks": [
+        {
+          "check": "menciona:no es posible|no se puede|nadie puede|no existe|no hay forma|imposible|no permite",
+          "ok": true,
+          "detalle": ""
+        }
+      ],
+      "ok": true
+    },
+    {
+      "id": "fuera_de_tema",
+      "modelo_respuesta": "gemini-3.5-flash-lite",
+      "segundos": 1.5,
+      "respuesta": "Ese tema no está relacionado con el riesgo sísmico, tsunamis ni la geología de Chile. \n\nSi tienes alguna consulta sobre la sismicidad, fallas geológicas, riesgo sísmico de alguna comuna o qué hacer ante un sismo en el país, ¡con gusto te puedo ayudar!",
+      "herramientas": [],
+      "checks": [
+        {
+          "check": "sin_herramientas",
+          "ok": true,
+          "detalle": "usó []"
+        },
+        {
+          "check": "menciona:sísmic|sismo",
+          "ok": true,
+          "detalle": ""
+        },
+        {
+          "check": "no_menciona:Messi",
+          "ok": true,
+          "detalle": ""
+        }
+      ],
+      "ok": true
+    },
+    {
+      "id": "seguimiento_tsunami",
+      "modelo_respuesta": "gemini-3.5-flash-lite",
+      "segundos": 15.1,
+      "respuesta": "**Sí, la costanera de Arica se encuentra dentro de la zona de inundación por tsunami.**\n\nSegún la Carta de Inundación por Tsunami oficial del SHOA (**CITSU_Arica_4a_Ed_2021**), este punto queda dentro del área que se inundaría en el escenario de peor caso modelado para esa localidad (basado en un gran terremoto de subducción frente a su costa). \n\nHay que tener en cuenta que:\n* **No es una zona que se inunde de forma rutinaria**, sino un mapa de referencia que utilizan las autoridades para la planificación territorial, el ordenamiento del borde costero y la definición de rutas de evacuación.\n* Puedes revisar la carta completa y con mayor detalle en el sitio web oficial del SHOA ([shoa.cl/php/citsu.php](https://www.shoa.cl/php/citsu.php)).\n\n*(Fuente: [Cartas de Inundación por Tsunami (CITSU) del SHOA](https://www.directemar.cl/directemar/noticias-y-comunicaciones/noticias/2020/shoa-publica-cartas-de-inundacion-por-tsunami-citsu))*",
+      "herramientas": [
+        {
+          "nombre": "buscar_en_documentos",
+          "args": {
+            "pregunta": "carta citsu inundacion tsunami shoa"
+          }
+        }
+      ],
+      "checks": [
+        {
+          "check": "menciona:CITSU|SHOA|inundaci",
+          "ok": true,
+          "detalle": ""
+        }
+      ],
+      "ok": true
+    },
+    {
+      "id": "seguimiento_sin_repetir_geocodificacion",
+      "modelo_respuesta": "gemini-3.5-flash-lite",
+      "segundos": 76.3,
+      "respuesta": "El nivel **Alto** en el centro de Concepción se debe a una **regla de anulación por amenaza extrema** que utiliza nuestro modelo de riesgo:\n\n- Si un factor individual (como la **exposición a subducción**) supera el valor de 0,85, el nivel general se clasifica automáticamente como **Alto**, independientemente de que el puntaje total (en este caso 32.5%) no alcance el 60%.\n- En el caso de Concepción, este factor alcanza un valor elevado debido a su **cercanía a la costa (a unos 8.7 km)** y al historial de grandes terremotos de subducción en la zona (como el terremoto del Maule de 2010, M8.8). \n\nPuedes revisar más detalles sobre esta metodología en la [Metodología del modelo de riesgo de GeoRiesgo Chile](https://github.com/ren2v/georiesgo-chile).",
+      "herramientas": [
+        {
+          "nombre": "buscar_en_documentos",
+          "args": {
+            "pregunta": "por qué se clasifica como riesgo alto de subducción y cómo funciona la regla de anulación a alto"
+          }
+        }
+      ],
+      "checks": [
+        {
+          "check": "no_usa:geocodificar_direccion",
+          "ok": true,
+          "detalle": "usó ['buscar_en_documentos']"
+        },
+        {
+          "check": "menciona:falla|subducci|suelo|costa",
+          "ok": true,
+          "detalle": ""
+        }
+      ],
+      "ok": true
+    }
+  ]
+}

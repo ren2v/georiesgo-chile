@@ -26,15 +26,18 @@ from agente.herramientas import HERRAMIENTAS
 
 load_dotenv(Path(__file__).resolve().parents[2] / ".env")
 
-MODELO = os.getenv("GEORIESGO_MODELO", "google_genai:gemini-3.6-flash")
+# Tier gratuito de Gemini (límites del proyecto, sept. 2026):
+#   Flash Lite (3.5, 3.1):      15 peticiones/min, 500 peticiones/día
+#   Flash (3.5 a 3.8):           5 peticiones/min,  20 peticiones/día
+# Una pregunta usa 2-4 peticiones, así que con 20/día un modelo Flash no
+# alcanza ni para una corrida de evals: el principal es un Flash Lite. Los
+# errores 503 (modelo saturado) también descuentan cuota.
+MODELO = os.getenv("GEORIESGO_MODELO", "google_genai:gemini-3.5-flash-lite")
 
 # Si el modelo principal falla tras los reintentos, se prueba con estos, en
-# orden (lista separada por comas). En el tier gratuito de Gemini la cuota
-# diaria es por modelo (p. ej. 20 peticiones/día en gemini-3.8-flash) y los
-# modelos nuevos suelen estar saturados, así que una cadena larga es lo que
-# hace usable el agente.
+# orden (lista separada por comas). Cada modelo tiene su propia cuota diaria.
 MODELOS_RESPALDO_POR_DEFECTO = ",".join(f"google_genai:{m}" for m in [
-    "gemini-3.7-flash", "gemini-3.5-flash", "gemini-3.8-flash", "gemini-3.5-flash-lite", "gemini-3.1-flash-lite",
+    "gemini-3.1-flash-lite", "gemini-3.6-flash", "gemini-3.7-flash", "gemini-3.5-flash", "gemini-3.8-flash",
 ])
 MODELOS_RESPALDO = [
     m.strip()

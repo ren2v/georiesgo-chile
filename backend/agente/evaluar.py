@@ -27,15 +27,16 @@ CASOS = RAIZ / "evals" / "casos.yaml"
 RESULTADOS = RAIZ / "evals" / "resultados"
 
 # Pausa entre casos para no chocar con el límite de peticiones por minuto
-# del tier gratuito.
-PAUSA_ENTRE_CASOS_S = 8
+# del tier gratuito (15/min en Flash Lite; cada caso hace 2-4 peticiones).
+PAUSA_ENTRE_CASOS_S = 12
 
 NIVELES = ["Alto", "Moderado", "Bajo"]
 
 
-def normalizar(texto: str) -> str:
-    """Minúsculas y sin tildes: "Evacúa" y "evacua" deben calzar igual."""
-    descompuesto = unicodedata.normalize("NFD", texto.lower())
+def normalizar(texto) -> str:
+    """Minúsculas y sin tildes: "Evacúa" y "evacua" deben calzar igual.
+    Acepta números porque YAML convierte 2014 u 8.2 sin comillas en int/float."""
+    descompuesto = unicodedata.normalize("NFD", str(texto).lower())
     return "".join(c for c in descompuesto if unicodedata.category(c) != "Mn")
 
 
@@ -80,7 +81,7 @@ def verificar(caso: dict, resultado: dict) -> list[dict]:
         check(f"no_usa:{prohibida}", prohibida not in usadas, f"usó {usadas}")
 
     for grupo in caso.get("debe_mencionar", []):
-        check(f"menciona:{'|'.join(grupo)}", any(contiene(respuesta, f) for f in grupo))
+        check(f"menciona:{'|'.join(map(str, grupo))}", any(contiene(respuesta, f) for f in grupo))
 
     for frase in caso.get("no_debe_mencionar", []):
         check(f"no_menciona:{frase}", not contiene(respuesta, frase))
@@ -139,12 +140,20 @@ def main():
     elif filtro := set(argumentos):
         casos = [c for c in casos if c["id"] in filtro]
 
+    RESULTADOS.mkdir(parents=True, exist_ok=True)
+    if salida is None:
+        modelo = agente.MODELO.replace(":", "_").replace("/", "_")
+        salida = RESULTADOS / f"{datetime.now():%Y-%m-%d_%H%M}_{modelo}.json"
+
     print(f"Modelo: {agente.MODELO} (respaldo: {', '.join(agente.MODELOS_RESPALDO) or 'ninguno'}) · {len(casos)} casos\n")
     for i, caso in enumerate(casos):
         if i:
             time.sleep(PAUSA_ENTRE_CASOS_S)
         r = correr_caso(caso)
         anteriores[r["id"]] = r
+        # Se guarda tras cada caso: si la corrida se cae a la mitad, lo ya
+        # evaluado no se pierde y --reintentar retoma desde ahí.
+        resumen = guardar(salida, anteriores)
         if "error" in r:
             print(f"ERROR {r['id']}\n       ✗ {r['error'][:200]}")
             continue
@@ -153,7 +162,15 @@ def main():
             if not c["ok"]:
                 print(f"       ✗ {c['check']} {c['detalle']}")
 
-    resultados = list(anteriores.values())
+    resumen = guardar(salida, anteriores)
+    print(f"\nCasos: {resumen['casos_ok']}/{resumen['casos_evaluados']} · "
+          f"Checks: {resumen['checks_ok']}/{resumen['checks_total']} · "
+          f"Sin evaluar por error de servicio: {resumen['casos_con_error_de_servicio']}")
+    print(f"Detalle en {salida.relative_to(RAIZ)}")
+
+
+def guardar(salida: Path, resultados_por_id: dict) -> dict:
+    resultados = list(resultados_por_id.values())
     # Los casos con error de servicio no se evaluaron: no cuentan como falla
     # del agente, se informan aparte para no mezclar calidad con disponibilidad.
     evaluados = [r for r in resultados if "error" not in r]
@@ -164,21 +181,13 @@ def main():
         "checks_ok": sum(c["ok"] for r in evaluados for c in r["checks"]),
         "checks_total": sum(len(r["checks"]) for r in evaluados),
     }
-    print(f"\nCasos: {resumen['casos_ok']}/{resumen['casos_evaluados']} · "
-          f"Checks: {resumen['checks_ok']}/{resumen['checks_total']} · "
-          f"Sin evaluar por error de servicio: {resumen['casos_con_error_de_servicio']}")
-
-    RESULTADOS.mkdir(parents=True, exist_ok=True)
-    if salida is None:
-        modelo = agente.MODELO.replace(":", "_").replace("/", "_")
-        salida = RESULTADOS / f"{datetime.now():%Y-%m-%d_%H%M}_{modelo}.json"
     salida.write_text(json.dumps({
         "modelo": agente.MODELO,
         "modelos_respaldo": agente.MODELOS_RESPALDO,
         **resumen,
         "resultados": resultados,
     }, ensure_ascii=False, indent=2), encoding="utf-8")
-    print(f"Detalle en {salida.relative_to(RAIZ)}")
+    return resumen
 
 
 if __name__ == "__main__":
