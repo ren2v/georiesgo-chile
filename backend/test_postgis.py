@@ -92,11 +92,13 @@ def test_sismos_paridad(nombre, filtros):
 
     # Haversine (esfera) vs. elipsoide: descartamos los que están en el
     # borde del radio y comparamos como conjuntos (el orden entre sismos con
-    # la misma fecha no está definido en ninguno de los dos backends).
+    # la misma fecha no está definido en ninguno de los dos backends). Un
+    # sismo se descarta si CUALQUIERA de los dos lo ve en el borde: si no, uno
+    # a 98.8 km en PostGIS y 99.0 km en memoria quedaría solo de un lado.
     borde = filtros["radio_km"] * 0.99
     clave = lambda s: (s["fecha"], s["magnitud"], s["profundidad_km"])
-    assert {clave(s) for s in postgis if s["distancia_km"] < borde} == \
-           {clave(s) for s in memoria if s["distancia_km"] < borde}
+    en_borde = {clave(s) for s in memoria + postgis if s["distancia_km"] >= borde}
+    assert {clave(s) for s in postgis} - en_borde == {clave(s) for s in memoria} - en_borde
 
 
 @pytest.mark.parametrize("nombre", IDS)

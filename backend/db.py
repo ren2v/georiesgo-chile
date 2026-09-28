@@ -4,7 +4,7 @@ from sqlalchemy import create_engine
 
 # Credenciales de desarrollo que calzan con docker-compose.yml. En producción
 # se sobreescriben con la variable de entorno DATABASE_URL.
-DATABASE_URL_POR_DEFECTO = "postgresql+psycopg2://georiesgo:georiesgo@localhost:5433/georiesgo"
+DATABASE_URL_POR_DEFECTO = "postgresql+psycopg2://georiesgo:georiesgo@localhost:5434/georiesgo"
 
 
 @lru_cache(maxsize=1)

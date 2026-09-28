@@ -26,6 +26,10 @@ PUNTO = """
 
 
 def _consultar(sql: str, **params) -> list:
+    # psycopg2 adapta np.float64 con su repr, que en NumPy 2 es el texto
+    # "np.float64(-18.5)" y rompe el SQL. Todos los parámetros son numéricos,
+    # así que los pasamos a float de Python.
+    params = {k: float(v) for k, v in params.items()}
     with obtener_engine().connect() as conn:
         return conn.execute(text(sql), params).mappings().all()
 

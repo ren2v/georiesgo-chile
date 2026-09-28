@@ -24,7 +24,7 @@ GEORIESGO_BACKEND=postgis uvicorn main:app --app-dir backend
 ```
 
 `DATABASE_URL` sobreescribe la conexión por defecto
-(`postgresql+psycopg2://georiesgo:georiesgo@localhost:5433/georiesgo`).
+(`postgresql+psycopg2://georiesgo:georiesgo@localhost:5434/georiesgo`).
 
 ### Qué hace el ETL (`backend/cargar_postgis.py`)
 
