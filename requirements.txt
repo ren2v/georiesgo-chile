@@ -1,12 +1,30 @@
-fastapi
-uvicorn[standard]
-geopandas
-shapely
-pandas
-numpy
-requests
-sqlalchemy
-geoalchemy2
-psycopg2-binary
-pytest
-httpx
+# Versiones fijadas: una actualización sin fijar (pandas 2 -> 3) ya cambió
+# el comportamiento de Series.apply y rompió tests. Actualizar a propósito.
+
+# API
+fastapi==0.141.1
+uvicorn[standard]==0.52.1
+requests==2.34.2
+
+# Datos espaciales
+geopandas==1.1.4
+shapely==2.1.2
+pandas==3.0.5
+numpy==2.5.2
+
+# PostGIS
+sqlalchemy==2.0.54
+geoalchemy2==0.20.0
+psycopg2-binary==2.9.13
+
+# Agente: RAG sobre pgvector con embeddings locales
+langchain-core==1.6.5
+langchain-postgres==0.0.18
+langchain-text-splitters==1.1.2
+fastembed==0.8.1
+psycopg[binary]==3.3.6
+pyyaml==6.0.3
+
+# Tests
+pytest==9.1.1
+httpx==0.28.1

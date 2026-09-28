@@ -32,6 +32,19 @@ if BACKEND == "memoria":
     tsunami_citsu = gpd.read_file(DATA_DIR / "tsunami" / "citsu_chile.geojson")
 
 
+CHILE_BOUNDS = {"lat_min": -56, "lat_max": -17, "lng_min": -76, "lng_max": -66}
+
+
+def error_coordenadas(lat: float, lng: float):
+    """Mensaje de error si el punto cae fuera del rectángulo de Chile
+    continental, o None si es válido. Lo usan la API y el agente."""
+    if not (CHILE_BOUNDS["lat_min"] <= lat <= CHILE_BOUNDS["lat_max"]):
+        return "Latitud fuera del territorio chileno"
+    if not (CHILE_BOUNDS["lng_min"] <= lng <= CHILE_BOUNDS["lng_max"]):
+        return "Longitud fuera del territorio chileno"
+    return None
+
+
 def consultar_geologia(lat: float, lng: float) -> dict:
     punto = Point(lng, lat)
     resultado = geologia[geologia.geometry.contains(punto)]

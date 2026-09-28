@@ -12,14 +12,10 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-CHILE_BOUNDS = {"lat_min": -56, "lat_max": -17, "lng_min": -76, "lng_max": -66}
-
-
 def validar_coordenadas(lat: float, lng: float):
-    if not (CHILE_BOUNDS["lat_min"] <= lat <= CHILE_BOUNDS["lat_max"]):
-        raise HTTPException(status_code=400, detail="Latitud fuera del territorio chileno")
-    if not (CHILE_BOUNDS["lng_min"] <= lng <= CHILE_BOUNDS["lng_max"]):
-        raise HTTPException(status_code=400, detail="Longitud fuera del territorio chileno")
+    error = geo.error_coordenadas(lat, lng)
+    if error:
+        raise HTTPException(status_code=400, detail=error)
 
 
 def consultar_elevacion(lat: float, lng: float):

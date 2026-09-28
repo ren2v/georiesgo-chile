@@ -1,6 +1,7 @@
 services:
   db:
-    image: postgis/postgis:16-3.4
+    build: docker/db
+    image: georiesgo-db:16-3.4-pgvector
     container_name: georiesgo-postgis
     environment:
       POSTGRES_DB: georiesgo
