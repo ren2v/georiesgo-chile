@@ -44,11 +44,53 @@ GEORIESGO_BACKEND=postgis uvicorn main:app --app-dir backend
 Las distancias se miden sobre el elipsoide en vez de reproyectar a UTM 19S:
 Chile cruza los husos 18 y 19, así que un solo huso distorsiona en los extremos.
 
-## Agente (en construcción)
+## Agente
 
 Un agente conversacional que responde preguntas como "¿qué tan riesgosa es
 Av. Providencia 1234?" combinando las consultas espaciales del modelo con
-búsqueda en documentos (RAG).
+búsqueda en documentos (RAG). Está construido con LangChain (`create_agent`,
+sobre LangGraph) y es independiente del proveedor del modelo.
+
+### Configuración
+
+Crea un archivo `.env` en la raíz (está en `.gitignore`):
+
+```bash
+GOOGLE_API_KEY=...                                  # key gratuita de aistudio.google.com
+# GEORIESGO_MODELO=google_genai:gemini-3.8-flash    # por defecto
+# GEORIESGO_MODELO=anthropic:claude-opus-5          # otro proveedor: requiere langchain-anthropic y ANTHROPIC_API_KEY
+```
+
+```bash
+python backend/agente/consola.py    # chat en la terminal
+uvicorn main:app --app-dir backend  # API: POST /agente responde en streaming (SSE)
+```
+
+El frontend tiene una pestaña **Asistente**: cuando el agente evalúa un
+lugar, el mapa vuela a ese punto. Con el frontend servido desde localhost
+apunta a la API local.
+
+### Cómo funciona (`backend/agente/agente.py`)
+
+- Prompt de sistema que obliga a sacar cualquier dato de las herramientas
+  (nunca cifras de memoria), a aclarar que el puntaje es relativo y a
+  recomendar profesionales para decisiones de construcción.
+- Topes por pregunta con middleware de LangChain: máximo 6 llamadas al
+  modelo y 10 a herramientas, para que un loop no consuma la cuota.
+- Memoria de conversación por `conversacion_id` (checkpointer de LangGraph).
+- Streaming de eventos: qué herramienta usa y el texto a medida que se genera.
+
+### Evals (`evals/casos.yaml`, `backend/agente/evaluar.py`)
+
+16 casos con verificaciones deterministas, sin LLM como juez: herramientas
+esperadas y en qué orden, que el nivel de riesgo de la respuesta coincida
+con el que devolvió la herramienta (detecta resultados inventados),
+contenido obligatorio (p. ej. "evacuar" ante un sismo en la playa) y
+rechazo de preguntas fuera de tema.
+
+```bash
+python backend/agente/evaluar.py   # guarda el detalle en evals/resultados/
+```
 
 ### Base de conocimiento y RAG (`backend/agente/rag.py`)
 
@@ -89,3 +131,5 @@ todo el país (se salta automáticamente si PostGIS no está disponible), y
 `benchmark_backends.py` compara sus latencias. `test_agente.py` cubre las
 herramientas y el RAG, incluida una regresión de calidad de búsqueda: para
 preguntas conocidas, el documento correcto debe quedar entre los 3 primeros.
+`test_agente_loop.py` prueba el loop del agente y el endpoint con un modelo
+falso (sin gastar cuota) y `test_evals.py`, las verificaciones de las evals.

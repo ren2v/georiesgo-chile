@@ -17,6 +17,12 @@ sqlalchemy==2.0.54
 geoalchemy2==0.20.0
 psycopg2-binary==2.9.13
 
+# Agente: LangChain/LangGraph; el modelo se elige con GEORIESGO_MODELO
+langchain==1.4.2
+langgraph==1.2.12
+langchain-google-genai==4.4.0
+python-dotenv==1.2.3
+
 # Agente: RAG sobre pgvector con embeddings locales
 langchain-core==1.6.5
 langchain-postgres==0.0.18

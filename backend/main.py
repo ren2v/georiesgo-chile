@@ -1,7 +1,15 @@
+import json
+import logging
+import uuid
+
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import StreamingResponse
+from pydantic import BaseModel, Field
 import requests
 import geo
+
+logger = logging.getLogger("georiesgo")
 
 app = FastAPI(title="GeoRiesgo Chile API")
 
@@ -40,7 +48,7 @@ def consultar_elevacion(lat: float, lng: float):
 
 @app.get("/")
 def raiz():
-    return {"mensaje": "GeoRiesgo Chile API", "backend_datos": geo.BACKEND, "endpoints": ["/geologia", "/fallas", "/sismos", "/consulta", "/riesgo"]}
+    return {"mensaje": "GeoRiesgo Chile API", "backend_datos": geo.BACKEND, "endpoints": ["/geologia", "/fallas", "/sismos", "/consulta", "/riesgo", "/agente"]}
 
 
 @app.get("/geologia")
@@ -92,3 +100,49 @@ def riesgo(lat: float, lng: float):
         resultado["elevacion_m"] = None
 
     return resultado
+
+
+class PreguntaAgente(BaseModel):
+    mensaje: str = Field(min_length=1, max_length=1000)
+    # Mismo id en varias preguntas = misma conversación (el agente recuerda
+    # lo anterior). Si no viene, se crea una nueva y se devuelve en el evento
+    # "inicio" para que el cliente la reutilice.
+    conversacion_id: str | None = Field(default=None, max_length=64)
+
+
+@app.post("/agente")
+async def preguntar_al_agente(pregunta: PreguntaAgente):
+    """Responde en streaming (Server-Sent Events): un evento por herramienta
+    que el agente decide usar y por cada fragmento de texto de la respuesta."""
+    # Importación diferida: LangChain y el modelo de embeddings solo se
+    # cargan si alguien usa el agente; el resto de la API arranca igual.
+    from agente import agente
+
+    if not agente.llave_configurada():
+        raise HTTPException(status_code=503, detail="El agente no está configurado (falta la API key del modelo).")
+
+    conversacion_id = pregunta.conversacion_id or str(uuid.uuid4())
+
+    async def eventos():
+        yield _sse({"tipo": "inicio", "conversacion_id": conversacion_id})
+        try:
+            async for evento in agente.preguntar_en_vivo(pregunta.mensaje, conversacion_id):
+                yield _sse(evento)
+        except Exception as e:
+            # Con el stream ya abierto no se puede cambiar el código HTTP:
+            # el error viaja como un evento más.
+            logger.exception("Error del agente en la conversación %s", conversacion_id)
+            yield _sse({"tipo": "error", "detalle": _mensaje_error(e)})
+
+    return StreamingResponse(eventos(), media_type="text/event-stream")
+
+
+def _sse(evento: dict) -> str:
+    return f"data: {json.dumps(evento, ensure_ascii=False)}\n\n"
+
+
+def _mensaje_error(e: Exception) -> str:
+    texto = str(e)
+    if "429" in texto or "RESOURCE_EXHAUSTED" in texto or "quota" in texto.lower():
+        return "Se alcanzó el límite de uso gratuito del modelo. Intenta de nuevo en unos minutos."
+    return "El agente tuvo un problema al responder. Intenta de nuevo."

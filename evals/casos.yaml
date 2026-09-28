@@ -1,0 +1,99 @@
+# Casos de evaluación del agente. Cada verificación es determinista (no usa
+# otro LLM como juez), así el puntaje es reproducible y barato de correr.
+#
+# Campos:
+#   turnos                  preguntas en orden, en la misma conversación; se evalúa la última
+#   herramientas_esperadas  herramientas que deben aparecer, en ese orden relativo
+#   sin_herramientas        true si NO debe llamar ninguna herramienta
+#   no_debe_usar            herramientas que no debe llamar
+#   debe_mencionar          lista de grupos; cada grupo es una lista de alternativas
+#                           y basta que la respuesta contenga UNA (sin distinguir mayúsculas ni tildes)
+#   no_debe_mencionar       frases que no deben aparecer
+#   nivel_consistente       la respuesta debe nombrar el nivel de riesgo que devolvió
+#                           evaluar_riesgo_sismico, y ningún otro
+
+- id: riesgo_direccion_valparaiso
+  turnos: ["¿Qué riesgo sísmico tiene Cerro Alegre, Valparaíso?"]
+  herramientas_esperadas: [geocodificar_direccion, evaluar_riesgo_sismico]
+  nivel_consistente: true
+  debe_mencionar: [[relativ, comparación, compara]]
+
+- id: riesgo_direccion_santiago
+  turnos: ["Quiero saber el riesgo sísmico de la Plaza de Armas de Santiago"]
+  herramientas_esperadas: [geocodificar_direccion, evaluar_riesgo_sismico]
+  nivel_consistente: true
+
+- id: riesgo_coordenadas_sin_geocodificar
+  turnos: ["¿Qué riesgo tiene el punto -33.45, -70.54?"]
+  herramientas_esperadas: [evaluar_riesgo_sismico]
+  no_debe_usar: [geocodificar_direccion]
+  nivel_consistente: true
+  debe_mencionar: [[San Ramón]]
+
+- id: riesgo_interior_atacama
+  turnos: ["¿Es riesgoso vivir en San Pedro de Atacama por los sismos?"]
+  herramientas_esperadas: [geocodificar_direccion, evaluar_riesgo_sismico]
+  nivel_consistente: true
+
+- id: punto_fuera_de_chile
+  turnos: ["¿Qué riesgo sísmico tiene el Obelisco de Buenos Aires?"]
+  debe_mencionar: [[fuera de Chile, fuera del territorio, solo Chile, sólo Chile, no está en Chile, Argentina]]
+  no_debe_mencionar: [Riesgo Alto, Riesgo Moderado, Riesgo Bajo]
+
+- id: construir_recomienda_profesional
+  turnos: ["Estoy pensando en comprar un terreno para construir en Reñaca, Viña del Mar. ¿Es seguro?"]
+  herramientas_esperadas: [geocodificar_direccion, evaluar_riesgo_sismico]
+  nivel_consistente: true
+  debe_mencionar: [[ingenier, geólog, mecánica de suelos]]
+
+- id: sismos_cercanos_iquique
+  turnos: ["¿Qué sismos grandes ha habido cerca de Iquique?"]
+  herramientas_esperadas: [geocodificar_direccion]
+  debe_mencionar: [[2014, M8, 8.2, 8,2, sism]]
+
+- id: fallas_las_condes
+  turnos: ["¿Hay fallas geológicas activas cerca de Las Condes?"]
+  herramientas_esperadas: [geocodificar_direccion]
+  debe_mencionar: [[San Ramón]]
+
+- id: que_hacer_playa
+  turnos: ["¿Qué hago si tiembla fuerte y estoy en la playa?"]
+  herramientas_esperadas: [buscar_en_documentos]
+  debe_mencionar: [[evacu], [altura, alto, elevad, zona segura, zona de seguridad, punto de encuentro]]
+
+- id: emergencia_en_curso
+  turnos: ["Está temblando muy fuerte y vivo frente al mar en Iquique, ¿qué hago?"]
+  debe_mencionar: [[evacu]]
+
+- id: que_es_citsu
+  turnos: ["¿Qué es una carta CITSU?"]
+  herramientas_esperadas: [buscar_en_documentos]
+  debe_mencionar: [[SHOA], [inundaci]]
+
+- id: como_se_calcula
+  turnos: ["¿Cómo calculan el puntaje de riesgo?"]
+  herramientas_esperadas: [buscar_en_documentos]
+  debe_mencionar: [[falla], [suelo], [subducci, costa]]
+
+- id: prediccion_terremotos
+  turnos: ["¿Me puedes decir cuándo va a ser el próximo terremoto en Santiago?"]
+  debe_mencionar: [[no es posible, no se puede, nadie puede, no existe, no hay forma, imposible, no permite]]
+
+- id: fuera_de_tema
+  turnos: ["¿Quién ganó el mundial de fútbol 2022?"]
+  sin_herramientas: true
+  debe_mencionar: [[sísmic, sismo]]
+  no_debe_mencionar: [Messi]
+
+- id: seguimiento_tsunami
+  turnos:
+    - "¿Qué riesgo sísmico tiene la costanera de Arica?"
+    - "¿Y está en zona de inundación por tsunami?"
+  debe_mencionar: [[CITSU, SHOA, inundaci]]
+
+- id: seguimiento_sin_repetir_geocodificacion
+  turnos:
+    - "¿Qué riesgo tiene el centro de Concepción?"
+    - "¿Por qué ese nivel?"
+  no_debe_usar: [geocodificar_direccion]
+  debe_mencionar: [[falla, subducci, suelo, costa]]
