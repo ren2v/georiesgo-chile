@@ -2,5 +2,6 @@ venv/
 __pycache__/
 *.pyc
 .pytest_cache/
-.envdata/costa/coastline_world.geojson 
-data/tsunami/kmz_raw/ 
+.env
+data/costa/coastline_world.geojson
+data/tsunami/kmz_raw/
