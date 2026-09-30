@@ -2,12 +2,18 @@
 #
 #   Static Web App (frontend) ──> Container App (API + agente) ──> PostgreSQL
 #                                        │                        (PostGIS + pgvector)
-#                                        └── imagen desde Container Registry
+#                                        └── imagen pública en GitHub Container Registry
 #   Logs de la API ──> Log Analytics
 #
-# Pensado para una suscripción Azure for Students: la API escala a cero y la
-# base es la más chica (B1ms), así que sin tráfico el costo es casi solo el
-# de la base.
+# Diseñado para costar US$0 en una suscripción Azure for Students:
+# - PostgreSQL B1ms con 32 GB: incluido gratis 12 meses (750 h/mes).
+# - Container Apps: escala a cero; el uso activo cae en la cuota gratuita
+#   mensual (180.000 vCPU-s).
+# - Static Web Apps: plan gratis.
+# - Imagen en GHCR (gratis en repos públicos) en vez de Azure Container
+#   Registry, que cuesta después de los 12 meses.
+# - Log Analytics con tope diario bajo la cuota gratuita de 5 GB/mes.
+# Pasados los 12 meses la base empieza a consumir crédito: `terraform destroy`.
 
 resource "random_string" "sufijo" {
   # Algunos nombres (registro, base, storage) son globales en Azure.
@@ -34,35 +40,10 @@ resource "azurerm_log_analytics_workspace" "logs" {
   location            = azurerm_resource_group.principal.location
   sku                 = "PerGB2018"
   retention_in_days   = 30
-  # Tope diario de ingesta: con crédito de estudiante no queremos sorpresas.
-  daily_quota_gb = 0.5
+  # Tope diario de ingesta: 0,15 GB/día x 30 = 4,5 GB/mes, bajo los 5 GB
+  # mensuales gratuitos de Log Analytics.
+  daily_quota_gb = 0.15
   tags           = var.etiquetas
-}
-
-# --- Registro de imágenes ---------------------------------------------------
-
-resource "azurerm_container_registry" "registro" {
-  name                = replace("acr${local.nombre}", "-", "")
-  resource_group_name = azurerm_resource_group.principal.name
-  location            = azurerm_resource_group.principal.location
-  sku                 = "Basic"
-  # Sin usuario/contraseña de administrador: la API descarga imágenes con
-  # una identidad administrada (rol AcrPull), no con credenciales.
-  admin_enabled = false
-  tags          = var.etiquetas
-}
-
-resource "azurerm_user_assigned_identity" "api" {
-  name                = "id-${local.nombre}-api"
-  resource_group_name = azurerm_resource_group.principal.name
-  location            = azurerm_resource_group.principal.location
-  tags                = var.etiquetas
-}
-
-resource "azurerm_role_assignment" "api_descarga_imagenes" {
-  scope                = azurerm_container_registry.registro.id
-  role_definition_name = "AcrPull"
-  principal_id         = azurerm_user_assigned_identity.api.principal_id
 }
 
 # --- Base de datos ----------------------------------------------------------
@@ -152,15 +133,8 @@ resource "azurerm_container_app" "api" {
   revision_mode                = "Single"
   tags                         = var.etiquetas
 
-  identity {
-    type         = "UserAssigned"
-    identity_ids = [azurerm_user_assigned_identity.api.id]
-  }
-
-  registry {
-    server   = azurerm_container_registry.registro.login_server
-    identity = azurerm_user_assigned_identity.api.id
-  }
+  # La imagen es pública en GitHub Container Registry, así que no hace falta
+  # un bloque `registry` con credenciales.
 
   # Secretos de Container Apps: no quedan en texto plano en la definición
   # del contenedor ni en los logs.
@@ -213,8 +187,6 @@ resource "azurerm_container_app" "api" {
       }
     }
   }
-
-  depends_on = [azurerm_role_assignment.api_descarga_imagenes]
 
   lifecycle {
     # Después del primer apply, la imagen la actualiza el pipeline de CI/CD

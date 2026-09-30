@@ -10,11 +10,6 @@ output "nombre_container_app" {
   value = azurerm_container_app.api.name
 }
 
-output "registro" {
-  description = "Servidor del Container Registry (para docker push)."
-  value       = azurerm_container_registry.registro.login_server
-}
-
 output "url_frontend" {
   value = "https://${azurerm_static_web_app.frontend.default_host_name}"
 }

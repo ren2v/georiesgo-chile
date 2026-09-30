@@ -39,9 +39,8 @@ if ($permitidas) {
 }
 
 # --- 2. Proveedores de recursos ----------------------------------------------
-$proveedores = "Microsoft.App", "Microsoft.ContainerRegistry", "Microsoft.DBforPostgreSQL",
-               "Microsoft.OperationalInsights", "Microsoft.ManagedIdentity", "Microsoft.Web",
-               "Microsoft.Storage"
+$proveedores = "Microsoft.App", "Microsoft.DBforPostgreSQL", "Microsoft.OperationalInsights",
+               "Microsoft.Web", "Microsoft.Storage"
 foreach ($p in $proveedores) {
     $estado = az provider show --namespace $p --query registrationState -o tsv
     if ($estado -ne "Registered") {

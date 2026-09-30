@@ -16,7 +16,7 @@ variable "prefijo" {
 }
 
 variable "imagen_api" {
-  description = "Imagen de la API. El primer apply usa una imagen pública de ejemplo porque el registro aún está vacío; después la reemplaza el pipeline de CI/CD."
+  description = "Imagen de la API (ghcr.io/<usuario>/georiesgo-chile-api:<tag>). El primer apply usa una imagen pública de ejemplo; después la reemplaza el pipeline de CI/CD."
   type        = string
   default     = "mcr.microsoft.com/k8se/quickstart:latest"
 }
