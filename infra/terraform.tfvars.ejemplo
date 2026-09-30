@@ -1,0 +1,8 @@
+# Copiar a terraform.tfvars (ignorado por git) y completar.
+
+subscription_id = "00000000-0000-0000-0000-000000000000" # az account show --query id -o tsv
+ubicacion       = "brazilsouth"                          # una región permitida por la suscripción
+
+# Opcionales
+# google_api_key   = "..."           # sin esto, /agente responde 503
+# ip_administrador = "203.0.113.10"  # para correr el ETL desde tu máquina

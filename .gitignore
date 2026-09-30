@@ -5,3 +5,12 @@ __pycache__/
 .env
 data/costa/coastline_world.geojson
 data/tsunami/kmz_raw/
+
+# Terraform: estado (tiene la contraseña de la base) y variables con secretos.
+# .terraform.lock.hcl sí se versiona, para fijar versiones de providers.
+infra/.terraform/
+*.tfstate
+*.tfstate.*
+*.tfvars
+!*.tfvars.ejemplo
+infra/backend.hcl
