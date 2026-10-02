@@ -683,7 +683,39 @@
     document.getElementById('tab-chat').classList.toggle('active', nombre === 'chat');
     document.getElementById('panel-body').classList.toggle('oculto', nombre !== 'punto');
     document.getElementById('chat').classList.toggle('oculto', nombre !== 'chat');
-    if (nombre === 'chat') document.getElementById('chat-input').focus();
+    if (nombre === 'chat') {
+      document.getElementById('chat-input').focus();
+      if (agenteDisponible === null) verificarAgente();
+    }
+  }
+
+  // El frontend puede quedar desplegado antes que una API con el agente (o
+  // apuntar a una API sin él): en vez de mostrar un error crudo al primer
+  // mensaje, se pregunta a la API qué endpoints tiene y se avisa.
+  let agenteDisponible = null; // null = aún no se sabe
+
+  async function verificarAgente() {
+    try {
+      const resp = await fetch(`${API_BASE}/`);
+      const info = await resp.json();
+      agenteDisponible = (info.endpoints || []).includes('/agente');
+    } catch {
+      return; // API dormida o sin red: se deja intentar y se maneja al enviar.
+    }
+    if (!agenteDisponible) mostrarAgenteNoDisponible();
+  }
+
+  function mostrarAgenteNoDisponible() {
+    agenteDisponible = false;
+    document.getElementById('sugerencias')?.remove();
+    agregarMensaje('herramienta', 'Asistente no disponible en esta demo');
+    agregarMensaje('agente', markdownSeguro(
+      'El asistente con IA todavía no está desplegado en la versión pública: ' +
+      'funciona en la versión local del proyecto y su despliegue en la nube está en curso. ' +
+      'Mientras tanto, haz clic en el mapa para consultar el riesgo de cualquier punto.'));
+    chatInput.disabled = true;
+    chatEnviar.disabled = true;
+    chatInput.placeholder = 'Asistente no disponible en esta demo';
   }
 
   function ponerMarcador(lat, lng, color) {
@@ -951,6 +983,7 @@
   }
 
   async function enviarPregunta(mensaje) {
+    if (agenteDisponible === false) return;
     document.getElementById('sugerencias')?.remove();
     agregarMensaje('usuario', escaparHtml(mensaje));
     chatEnviar.disabled = true;
@@ -963,6 +996,12 @@
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ mensaje, conversacion_id: conversacionId }),
       });
+      if (resp.status === 404 || resp.status === 405) {
+        // La API desplegada no tiene el endpoint del agente.
+        pensando.remove();
+        mostrarAgenteNoDisponible();
+        return;
+      }
       if (!resp.ok) {
         const err = await resp.json().catch(() => ({}));
         throw new Error(err.detail || `HTTP ${resp.status}`);
@@ -999,8 +1038,10 @@
       agregarMensaje('error', escaparHtml(detalle));
     } finally {
       pensando.remove();
-      chatEnviar.disabled = false;
-      chatInput.focus();
+      if (agenteDisponible !== false) {
+        chatEnviar.disabled = false;
+        chatInput.focus();
+      }
     }
   }
 
