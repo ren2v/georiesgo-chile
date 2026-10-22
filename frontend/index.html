@@ -941,8 +941,9 @@
     return texto.replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
   }
 
-  // Markdown mínimo (párrafos, listas, negrita, enlaces http/https) sobre
-  // texto YA escapado: la salida de un LLM nunca se inserta como HTML crudo.
+  // Markdown mínimo (párrafos, títulos, listas, negrita, cursiva, enlaces
+  // http/https) sobre texto YA escapado: la salida de un LLM nunca se inserta
+  // como HTML crudo.
   function markdownSeguro(texto) {
     const lineas = escaparHtml(texto).split('\n');
     let html = '', enLista = false;
@@ -954,11 +955,17 @@
         continue;
       }
       if (enLista) { html += '</ul>'; enLista = false; }
-      if (linea.trim()) html += `<p>${linea}</p>`;
+      // Los títulos se muestran como un párrafo en negrita: en un chat
+      // angosto un <h3> pesa demasiado.
+      const titulo = linea.match(/^\s*#{1,6}\s+(.*)$/);
+      if (titulo) html += `<p><strong>${titulo[1]}</strong></p>`;
+      else if (linea.trim()) html += `<p>${linea}</p>`;
     }
     if (enLista) html += '</ul>';
     return html
       .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+      // Cursiva solo con el asterisco pegado al texto: "2 * 3 * 4" no cuenta.
+      .replace(/\*(?=\S)([^*<>\n]+?)(?<=\S)\*/g, '<em>$1</em>')
       .replace(/\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/g, '<a href="$2" target="_blank" rel="noopener noreferrer">$1</a>');
   }
 
